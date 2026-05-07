@@ -1,6 +1,6 @@
 /**
  * @file simviz.cpp
- * @brief Simulation and visualization of panda robot with 1 DOF gripper
+ * @brief Simulation and visualization of a single Flexiv robot
  *
  */
 
@@ -38,11 +38,11 @@ VectorXd ui_torques;
 mutex mutex_torques, mutex_update;
 
 // specify urdf and robots
-static const string robot_name = "panda_arm_hand";
+static const string robot_name = "flexiv";
 static const string camera_name = "camera_fixed";
 
 // dynamic objects information
-const vector<std::string> object_names = {"Ball"};
+const vector<std::string> object_names = {};
 vector<Affine3d> object_poses;
 vector<VectorXd> object_velocities;
 const int n_objects = object_names.size();
@@ -53,7 +53,7 @@ void simulation(std::shared_ptr<SaiSimulation::SaiSimulation> sim);
 int main()
 {
 	SaiModel::URDF_FOLDERS["CS225A_URDF_FOLDER"] = string(CS225A_URDF_FOLDER);
-	static const string robot_file = string(CS225A_URDF_FOLDER) + "/panda/panda_arm_hand.urdf";
+	static const string robot_file = string(CS225A_URDF_FOLDER) + "/flexiv/flexiv.urdf";
 	static const string world_file = string(KENDAMA_ROBOT_FOLDER) + "/world_my_project.urdf";
 	std::cout << "Loading URDF world model file: " << world_file << endl;
 
@@ -71,8 +71,13 @@ int main()
 
 	// load robots
 	auto robot = std::make_shared<SaiModel::SaiModel>(robot_file, false);
-	// robot->setQ();
-	// robot->setDq();
+	VectorXd q_initial = VectorXd::Zero(robot->dof());
+	if (robot->dof() == 7)
+	{
+		q_initial << 0.0, -0.6, 0.0, 1.6, 0.0, 1.0, 0.0;
+	}
+	robot->setQ(q_initial);
+	robot->setDq(VectorXd::Zero(robot->dof()));
 	robot->updateModel();
 	ui_torques = VectorXd::Zero(robot->dof());
 

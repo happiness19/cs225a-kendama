@@ -9,6 +9,7 @@
 #include "redis/RedisClient.h"
 #include "timer/LoopTimer.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -25,7 +26,7 @@ void sighandler(int) { runloop = false; }
 int main()
 {
 	// Location of URDF files specifying world and robot information
-	static const string robot_file = string(CS225A_URDF_FOLDER) + "/panda/panda_arm_hand.urdf";
+	static const string robot_file = string(CS225A_URDF_FOLDER) + "/flexiv/flexiv.urdf";
 
 	// start redis client
 	auto redis_client = SaiCommon::RedisClient();
@@ -44,20 +45,21 @@ int main()
 
 	// prepare controller
 	int dof = robot->dof();
-	VectorXd command_torques = VectorXd::Zero(dof); // panda + gripper torques
+	VectorXd command_torques = VectorXd::Zero(dof);
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// arm task
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0, 0, 0.17);
+	const Vector3d control_point = Vector3d(0, 0, 0.081);
 	Affine3d compliant_frame = Affine3d::Identity();
 	compliant_frame.translation() = control_point;
 	auto pose_task = std::make_shared<SaiPrimitives::MotionForceTask>(robot, control_link, compliant_frame);
-	pose_task->setPosControlGains(400, 40, 0);
-	pose_task->setOriControlGains(400, 40, 0);
+	pose_task->setPosControlGains(1600, 90, 0);
+	pose_task->setOriControlGains(700, 55, 0);
 
-	Vector3d ee_pos;
-	Matrix3d ee_ori;
+	const Vector3d ee_pos_initial = robot->position(control_link, control_point);
+	const Matrix3d ee_ori_initial = robot->rotation(control_link);
+	const Vector3d ee_pos_goal = ee_pos_initial + Vector3d(0.0, 0.0, 0.5);
 
 	// joint task
 	auto joint_task = std::make_shared<SaiPrimitives::JointTask>(robot);
@@ -66,8 +68,6 @@ int main()
 	VectorXd q_desired(dof);
 	q_desired << robot->q(); // set desired joint angles same as the initial sim configuration
 	joint_task->setGoalPosition(q_desired);
-
-	VectorXd ee_pos_desired(3);
 
 	// create a loop timer
 	runloop = true;
@@ -84,9 +84,13 @@ int main()
 		robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
 		robot->updateModel();
 
-		// update goal position and orientation
-		ee_pos_desired << 0.5, 0, 0.2 + 0.1 * sin(time);
+		// Move quickly upward, then hold the goal at about 0.5 m.
+		const double motion_duration = 0.18;
+		const double s = std::min(time / motion_duration, 1.0);
+		const double smooth_step = s * s * (3.0 - 2.0 * s);
+		const Vector3d ee_pos_desired = ee_pos_initial + smooth_step * (ee_pos_goal - ee_pos_initial);
 		pose_task->setGoalPosition(ee_pos_desired);
+		pose_task->setGoalOrientation(ee_ori_initial);
 
 		// update task model
 		N_prec.setIdentity();
