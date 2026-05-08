@@ -25,6 +25,16 @@ else:
   robot_name = "Rizon4r"
   config_file_for_this_example = simulation_config_file
 
+# Step 1:
+# sh scripts/launch.sh config_folder/xml_config_files/single_rizon_real.xml
+# Step 2: run this script 
+# python3 python_examples/rizon_up.py
+
+# To run in real:
+# Step 0: 
+# Make sure the robot is powered on and the estop is released. Also make sure to have the safety key with you.
+# Start redis server: src1@src1-GTi:~/OpenSai/drivers/FlexivRizonRedisDriver/redis_driver$ sh launch_titania-4s_gripper_driver.sh 
+# and then do the other thing
 
 @dataclass
 class RedisKeys:
