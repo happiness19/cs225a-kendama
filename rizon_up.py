@@ -3,6 +3,7 @@ import time
 import json
 import redis
 import math
+import argparse
 from enum import Enum, auto
 from dataclasses import dataclass
 
@@ -17,7 +18,11 @@ simulation_robot_name = "Rizon4r"
 
 real_robot_config_file = "single_rizon_real.xml"
 simulation_config_file = "single_rizon_vis.xml"
-ENV = "real" # "real" or "simulation"
+parser = argparse.ArgumentParser()
+parser.add_argument("--real", action="store_true", help="Run against the real robot instead of simulation.")
+args = parser.parse_args()
+
+ENV = "real" if args.real else "simulation"
 if ENV == "real":
   robot_name = "Titania"
   config_file_for_this_example = real_robot_config_file
@@ -29,6 +34,8 @@ else:
 # sh scripts/launch.sh config_folder/xml_config_files/single_rizon_real.xml
 # Step 2: run this script 
 # python3 python_examples/rizon_up.py
+# optional argument: --real, that runs the real robot
+# usage: python3 python_examples/rizon_up.py --real, otherwise defaults to simulation
 
 # To run in real:
 # Step 0: 
