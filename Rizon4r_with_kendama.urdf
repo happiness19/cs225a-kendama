@@ -398,49 +398,49 @@
  <joint name="joint1" type="revolute">
         <parent link="base_link"/>
         <child link="link1"/>
-        <origin rpy="0.0 0.0 -3.141592653589793" xyz="0.0 0.0 0.155"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.155"/>
         <axis xyz="0 0 1"/>
         <limit effort="123" lower="-2.7925" upper="2.7925" velocity="2.0944"/>
     </joint>
     <joint name="joint2" type="revolute">
         <parent link="link1"/>
         <child link="link2"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.03 0.21"/>
+        <origin rpy="-1.57079632679 0 0" xyz="0.0 0.03 0.21"/>
         <axis xyz="0 1 0"/>
         <limit effort="123" lower="-2.2689" upper="2.2689" velocity="2.0944"/>
     </joint>
     <joint name="joint3" type="revolute">
         <parent link="link2"/>
         <child link="link3"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.035 0.205"/>
+        <origin rpy="1.57079632679 0 0" xyz="0.0 0.035 0.205"/>
         <axis xyz="0 0 1"/>
         <limit effort="64" lower="-2.9671" upper="2.9671" velocity="2.4435"/>
     </joint>
     <joint name="joint4" type="revolute">
         <parent link="link3"/>
         <child link="link4"/>
-        <origin rpy="0.0 0.0 -3.141592653589793" xyz="-0.02 -0.03 0.19"/>
+        <origin rpy="1.57079632679 0 0" xyz="-0.02 -0.03 0.19"/>
         <axis xyz="0 1 0"/>
         <limit effort="64" lower="-1.8675" upper="2.6878" velocity="2.4435"/>
     </joint>
     <joint name="joint5" type="revolute">
         <parent link="link4"/>
         <child link="link5"/>
-        <origin rpy="0.0 0.0 -3.141592653589793" xyz="-0.02 0.025 0.195"/>
+        <origin rpy="-1.57079632679 0 0" xyz="-0.02 0.025 0.195"/>
         <axis xyz="0 0 1"/>
         <limit effort="39" lower="-2.9671" upper="2.9671" velocity="4.8869"/>
     </joint>
     <joint name="joint6" type="revolute">
         <parent link="link5"/>
         <child link="link6"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.03 0.19"/>
+        <origin rpy="1.57079632679 0 0.0" xyz="0.0 0.03 0.19"/>
         <axis xyz="0 1 0"/>
         <limit effort="39" lower="-1.3963" upper="4.5379" velocity="4.8869"/>
     </joint>
     <joint name="joint7" type="revolute">
         <parent link="link6"/>
         <child link="link7"/>
-        <origin rpy="0.0 -1.5707963478683205 0.0" xyz="-0.015 0.073 0.11"/>
+        <origin rpy="0.0 0 0.0" xyz="-0.015 0.073 0.11"/>
         <axis xyz="0 0 1"/>
         <limit effort="39" lower="-2.9671" upper="2.9671" velocity="4.8869"/>
     </joint>
@@ -487,62 +487,17 @@
     <joint name="kendama_to_big_cup" type="fixed">
         <parent link="kendama"/>
         <child link="kendama_big_cup"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.135 0.04 0.0"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.135 -0.04 0.0"/>
     </joint>
     <joint name="kendama_to_small_cup" type="fixed">
         <parent link="kendama"/>
         <child link="kendama_small_cup"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.135 -0.04 0.0"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.135 0.04 0.0"/>
     </joint>
     <joint name="kendama_to_spike" type="fixed">
         <parent link="kendama"/>
         <child link="kendama_spike"/>
         <origin rpy="0.0 0.0 0.0" xyz="0.175 0.0 0.0"/>
-    </joint>
-    <joint name="kendama_to_string_1" type="fixed">
-        <parent link="kendama"/>
-        <child link="kendama_string_1"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.13 0.0 0.0"/>
-    </joint>
-    <joint name="string_1_to_string_2" type="fixed">
-        <parent link="kendama_string_1"/>
-        <child link="kendama_string_2"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_2_to_string_3" type="fixed">
-        <parent link="kendama_string_2"/>
-        <child link="kendama_string_3"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_3_to_string_4" type="fixed">
-        <parent link="kendama_string_3"/>
-        <child link="kendama_string_4"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_4_to_string_5" type="fixed">
-        <parent link="kendama_string_4"/>
-        <child link="kendama_string_5"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_5_to_string_6" type="fixed">
-        <parent link="kendama_string_5"/>
-        <child link="kendama_string_6"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_6_to_string_7" type="fixed">
-        <parent link="kendama_string_6"/>
-        <child link="kendama_string_7"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="string_7_to_string_8" type="fixed">
-        <parent link="kendama_string_7"/>
-        <child link="kendama_string_8"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
-    </joint>
-    <joint name="kendama_to_ball" type="fixed">
-        <parent link="kendama_string_8"/>
-        <child link="kendama_ball"/>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
     </joint>
 
   <material name="rizon_blue">
