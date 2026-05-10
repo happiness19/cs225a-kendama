@@ -3,7 +3,7 @@
 <world name="demo_world" gravity="0.0 0.0 -9.81">
 
 	<robot name="Rizon4r">
-		<model dir="${ROBOT_FILES_FOLDER}" path="Rizon4r.urdf" name="Rizon4r" />
+		<model dir="${ROBOT_FILES_FOLDER}" path="Rizon4r_with_kendama.urdf" name="Rizon4r" />
 	</robot>
 
 	<static_object name="Floor">

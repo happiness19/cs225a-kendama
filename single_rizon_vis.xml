@@ -9,7 +9,7 @@
 		enabledAtStartup="true"
 		addTimestampToFilename="false" />
 
-	<forceSensor robotOrObjectName="Rizon4R"
+	<forceSensor robotOrObjectName="Rizon4r"
 		linkName="flange"
 		filterCutoff="5.0" />
 </simvizConfiguration>

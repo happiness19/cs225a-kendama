@@ -1,0 +1,578 @@
+<?xml version="1.0"?>
+<!-- ======================================================================== -->
+<!-- | Flexiv Rizon 4s (with blurred dynamic parameters)                    | -->
+<!-- ======================================================================== -->
+
+<!-- ======================================================================== -->
+<!-- | Kendama is 75g Ball is 75g                    | -->
+<!-- ======================================================================== -->
+<robot name="rizon4r">
+
+  <link name="base_link">
+    <inertial>
+      <mass value="3.7" />
+      <origin rpy="0 0 0" xyz="0.0 -0.0 0.09" />
+      <inertia ixx="0.02" ixy="0.0" ixz="0.0" iyy="0.02" iyz="0.0" izz="0.02" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link0.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link0.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link1">
+    <inertial>
+      <mass value="3.7" />
+      <origin rpy="0 0 0" xyz="0.0 0.01 0.15" />
+      <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.03" iyz="0.0" izz="0.03" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link1.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="0 0 0" xyz="0 0 -0.0025" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.062 0.062 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link1.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link2">
+    <inertial>
+      <mass value="2.7" />
+      <origin rpy="0 0 0" xyz="0.0 0.04 0.1" />
+      <inertia ixx="0.02" ixy="0.0" ixz="0.0" iyy="0.02" iyz="-0.0" izz="0.02" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link2.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="1.5707963 0 0" xyz="0 -0.0025 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.062 0.062 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link2.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link3">
+    <inertial>
+      <mass value="2.4" />
+      <origin rpy="0 0 0" xyz="-0.01 -0.0 0.13" />
+      <inertia ixx="0.01" ixy="0.0" ixz="-0.0" iyy="0.01" iyz="-0.0" izz="0.01" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link3.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="0 0 0" xyz="0 0 -0.0025" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.051 0.051 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link3.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link4">
+    <inertial>
+      <mass value="2.4" />
+      <origin rpy="0 0 0" xyz="-0.01 0.03 0.1" />
+      <inertia ixx="0.02" ixy="0.0" ixz="-0.0" iyy="0.02" iyz="-0.0" izz="0.02" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link4.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="1.5707963 0 0" xyz="0 -0.0025 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.051 0.051 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link4.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link5">
+    <inertial>
+      <mass value="2.4" />
+      <origin rpy="0 0 0" xyz="-0.0 0.0 0.13" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link5.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="0 0 0" xyz="0 0 -0.0025" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.051 0.051 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link5.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link6">
+    <inertial>
+      <mass value="2.1" />
+      <origin rpy="0 0 0" xyz="-0.01 0.06 0.07" />
+      <inertia ixx="0.01" ixy="-0.0" ixz="-0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link6.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="1.5707963 0 0" xyz="0 -0.0025 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.051 0.051 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link6.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="link7">
+    <inertial>
+      <mass value="1.4" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.05" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+    <visual name="shell">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/link7.obj" />
+      </geometry>
+      <material name="rizon_light_grey" />
+    </visual>
+    <visual name="ring">
+      <origin rpy="1.5707963 0 0" xyz="0 -0.0025 0" />
+      <geometry>
+        <mesh filename="rizon4r/visual/ring.obj" scale="0.051 0.051 0.002" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <visual name="camera">
+      <origin rpy="1.5717 3.1415 1.5717" xyz="0.045 0 0.046" />
+      <geometry>
+        <mesh filename="rizon4r/visual/d405-camera-mount.obj" scale="1 1 1" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+    <visual name="left-eye">
+      <origin rpy="0 0 0" xyz="0.074 -0.01 0.136" />
+      <geometry>
+        <sphere radius="0.005"/>
+      </geometry> 
+      <material name="rizon_blue">
+        <color rgba="0.0 0.0 1.0 0.5" />
+      </material>
+    </visual>
+    <!-- <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="rizon4r/collision/link7.stl" />
+      </geometry>
+    </collision> -->
+  </link>
+  <link name="flange">
+   <inertial>
+      <mass value="0.0001" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.001" ixy="0.0" ixz="-0.0" iyy="0.001" iyz="-0.0" izz="0.001" />
+    </inertial>
+  </link>
+  <link name="end-effector">
+   <inertial>
+      <mass value="0.0001" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000001" ixy="0.0" ixz="0.0" iyy="0.000001" iyz="0.0" izz="0.000001" />
+    </inertial>
+  </link>
+  <link name="end_effector_mount_plate">
+   <inertial>
+      <mass value="0.025" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.000015" />
+    </inertial>
+    <visual name="mount_plate">
+      <origin rpy="0 1.5707963 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.035" length="0.012" />
+      </geometry>
+      <material name="rizon_dark_grey" />
+    </visual>
+  </link>
+  <link name="end_effector_clamp">
+   <inertial>
+      <mass value="0.025" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000015" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.000015" />
+    </inertial>
+    <visual name="kendama_clamp">
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <box size="0.05 0.07 0.035" />
+      </geometry>
+      <material name="rizon_white" />
+    </visual>
+  </link>
+  <link name="kendama">
+   <inertial>
+      <mass value="0.0001" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000001" ixy="0.0" ixz="0.0" iyy="0.000001" iyz="0.0" izz="0.000001" />
+    </inertial>
+  </link>
+  <link name="kendama_handle">
+   <inertial>
+      <mass value="0.03" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000002" ixy="0.0" ixz="0.0" iyy="0.000058" iyz="0.0" izz="0.000058" />
+    </inertial>
+    <visual name="handle">
+      <origin rpy="0 1.5707963 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.012" length="0.15" />
+      </geometry>
+      <material name="kendama_wood" />
+    </visual>
+  </link>
+  <link name="kendama_bottom_knob">
+   <inertial>
+      <mass value="0.008" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000001" ixy="0.0" ixz="0.0" iyy="0.000001" iyz="0.0" izz="0.000001" />
+    </inertial>
+    <visual name="bottom_knob">
+      <origin rpy="0 1.5707963 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.02" length="0.015" />
+      </geometry>
+      <material name="kendama_yellow" />
+    </visual>
+  </link>
+  <link name="kendama_crosspiece">
+   <inertial>
+      <mass value="0.017" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000009" ixy="0.0" ixz="0.0" iyy="0.000001" iyz="0.0" izz="0.000009" />
+    </inertial>
+    <visual name="sarado_crosspiece">
+      <origin rpy="1.5707963 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.012" length="0.08" />
+      </geometry>
+      <material name="kendama_wood" />
+    </visual>
+  </link>
+  <link name="kendama_big_cup">
+   <inertial>
+      <mass value="0.008" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000002" ixy="0.0" ixz="0.0" iyy="0.000002" iyz="0.0" izz="0.000004" />
+    </inertial>
+    <visual name="big_cup">
+      <origin rpy="1.5707963 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.03" length="0.018" />
+      </geometry>
+      <material name="kendama_red" />
+    </visual>
+  </link>
+  <link name="kendama_small_cup">
+   <inertial>
+      <mass value="0.007" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000002" ixy="0.0" ixz="0.0" iyy="0.000002" iyz="0.0" izz="0.000003" />
+    </inertial>
+    <visual name="small_cup">
+      <origin rpy="1.5707963 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.026" length="0.018" />
+      </geometry>
+      <material name="kendama_blue" />
+    </visual>
+  </link>
+  <link name="kendama_spike">
+   <inertial>
+      <mass value="0.005" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000001" ixy="0.0" ixz="0.0" iyy="0.000001" iyz="0.0" izz="0.000001" />
+    </inertial>
+    <visual name="spike">
+      <origin rpy="0 1.5707963 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <cylinder radius="0.006" length="0.05" />
+      </geometry>
+      <material name="kendama_wood" />
+    </visual>
+  </link>
+  <link name="kendama_string_1"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_1"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_2"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_2"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_3"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_3"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_4"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_4"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_5"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_5"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_6"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_6"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_7"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_7"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_string_8"><inertial><mass value="0.0005" /><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><inertia ixx="0.0000002" ixy="0.0" ixz="0.0" iyy="0.0000002" iyz="0.0" izz="0.000000001" /></inertial><visual name="string_8"><origin rpy="0 0 0" xyz="0.0 0.0 -0.0375" /><geometry><cylinder radius="0.0015" length="0.075" /></geometry><material name="kendama_string" /></visual></link>
+  <link name="kendama_ball">
+   <inertial>
+      <mass value="0.075" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.000027" ixy="0.0" ixz="0.0" iyy="0.000027" iyz="0.0" izz="0.000027" />
+    </inertial>
+    <visual name="ball">
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+      <material name="kendama_green" />
+    </visual>
+    <collision name="ball_collision">
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+    </collision>
+  </link>
+
+ <joint name="joint1" type="revolute">
+        <parent link="base_link"/>
+        <child link="link1"/>
+        <origin rpy="0.0 0.0 -3.141592653589793" xyz="0.0 0.0 0.155"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="123" lower="-2.7925" upper="2.7925" velocity="2.0944"/>
+    </joint>
+    <joint name="joint2" type="revolute">
+        <parent link="link1"/>
+        <child link="link2"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.03 0.21"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="123" lower="-2.2689" upper="2.2689" velocity="2.0944"/>
+    </joint>
+    <joint name="joint3" type="revolute">
+        <parent link="link2"/>
+        <child link="link3"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.035 0.205"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="64" lower="-2.9671" upper="2.9671" velocity="2.4435"/>
+    </joint>
+    <joint name="joint4" type="revolute">
+        <parent link="link3"/>
+        <child link="link4"/>
+        <origin rpy="0.0 0.0 -3.141592653589793" xyz="-0.02 -0.03 0.19"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="64" lower="-1.8675" upper="2.6878" velocity="2.4435"/>
+    </joint>
+    <joint name="joint5" type="revolute">
+        <parent link="link4"/>
+        <child link="link5"/>
+        <origin rpy="0.0 0.0 -3.141592653589793" xyz="-0.02 0.025 0.195"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="39" lower="-2.9671" upper="2.9671" velocity="4.8869"/>
+    </joint>
+    <joint name="joint6" type="revolute">
+        <parent link="link5"/>
+        <child link="link6"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.03 0.19"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="39" lower="-1.3963" upper="4.5379" velocity="4.8869"/>
+    </joint>
+    <joint name="joint7" type="revolute">
+        <parent link="link6"/>
+        <child link="link7"/>
+        <origin rpy="0.0 -1.5707963478683205 0.0" xyz="-0.015 0.073 0.11"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="39" lower="-2.9671" upper="2.9671" velocity="4.8869"/>
+    </joint>
+    <joint name="link7_to_flange" type="fixed">
+        <parent link="link7"/>
+        <child link="flange"/>
+        <origin rpy="0.0 0.0 -3.141592653589793" xyz="0.0 0.0 0.124"/>
+    </joint>
+    <joint name="flange_to_end_effector" type="fixed">
+        <parent link="flange"/>
+        <child link="end-effector"/>
+        <origin rpy="0.0 -1.5707963 0.0" xyz="0.0 0.0 0.0"/>
+    </joint>
+    <joint name="end_effector_to_mount_plate" type="fixed">
+        <parent link="end-effector"/>
+        <child link="end_effector_mount_plate"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.01 0.0 0.0"/>
+    </joint>
+    <joint name="end_effector_to_clamp" type="fixed">
+        <parent link="end-effector"/>
+        <child link="end_effector_clamp"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.04 0.0 0.0"/>
+    </joint>
+    <joint name="end_effector_to_kendama" type="fixed">
+        <parent link="end-effector"/>
+        <child link="kendama"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.065 0.0 0.0"/>
+    </joint>
+    <joint name="kendama_to_handle" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_handle"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.075 0.0 0.0"/>
+    </joint>
+    <joint name="kendama_to_bottom_knob" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_bottom_knob"/>
+        <origin rpy="0.0 0.0 0.0" xyz="-0.005 0.0 0.0"/>
+    </joint>
+    <joint name="kendama_to_crosspiece" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_crosspiece"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.135 0.0 0.0"/>
+    </joint>
+    <joint name="kendama_to_big_cup" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_big_cup"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.135 0.04 0.0"/>
+    </joint>
+    <joint name="kendama_to_small_cup" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_small_cup"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.135 -0.04 0.0"/>
+    </joint>
+    <joint name="kendama_to_spike" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_spike"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.175 0.0 0.0"/>
+    </joint>
+    <joint name="kendama_to_string_1" type="fixed">
+        <parent link="kendama"/>
+        <child link="kendama_string_1"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.13 0.0 0.0"/>
+    </joint>
+    <joint name="string_1_to_string_2" type="fixed">
+        <parent link="kendama_string_1"/>
+        <child link="kendama_string_2"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_2_to_string_3" type="fixed">
+        <parent link="kendama_string_2"/>
+        <child link="kendama_string_3"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_3_to_string_4" type="fixed">
+        <parent link="kendama_string_3"/>
+        <child link="kendama_string_4"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_4_to_string_5" type="fixed">
+        <parent link="kendama_string_4"/>
+        <child link="kendama_string_5"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_5_to_string_6" type="fixed">
+        <parent link="kendama_string_5"/>
+        <child link="kendama_string_6"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_6_to_string_7" type="fixed">
+        <parent link="kendama_string_6"/>
+        <child link="kendama_string_7"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="string_7_to_string_8" type="fixed">
+        <parent link="kendama_string_7"/>
+        <child link="kendama_string_8"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+    <joint name="kendama_to_ball" type="fixed">
+        <parent link="kendama_string_8"/>
+        <child link="kendama_ball"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.075"/>
+    </joint>
+
+  <material name="rizon_blue">
+    <color rgba="0.0 0.0 1.0 0.5" />
+  </material>
+  <material name="rizon_light_grey">
+    <color rgba="0.7 0.7 0.7 1.0" />
+  </material>
+  <material name="rizon_dark_grey">
+    <color rgba="0.4 0.4 0.4 1.0" />
+  </material>
+  <material name="rizon_white">
+    <color rgba="1.0 1.0 1.0 1.0" />
+  </material>
+  <material name="kendama_wood">
+    <color rgba="0.86 0.64 0.36 1.0" />
+  </material>
+  <material name="kendama_red">
+    <color rgba="0.9 0.05 0.03 1.0" />
+  </material>
+  <material name="kendama_yellow">
+    <color rgba="1.0 0.82 0.12 1.0" />
+  </material>
+  <material name="kendama_blue">
+    <color rgba="0.05 0.2 0.9 1.0" />
+  </material>
+  <material name="kendama_green">
+    <color rgba="0.0 0.65 0.16 1.0" />
+  </material>
+  <material name="kendama_string">
+    <color rgba="0.95 0.95 0.9 1.0" />
+  </material>
+</robot>
