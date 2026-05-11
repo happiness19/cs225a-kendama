@@ -50,7 +50,8 @@
 		</dynamic_object>
 
 		<dynamic_object name="KendamaBall">
-			<origin xyz="0.395725 0.193 0.887" rpy="0 0 0" />
+			<!-- <origin xyz="0.395725 0.193 0.887" rpy="0 0 0" /> -->
+			<origin xyz="0.431437 0.205012 0.887" rpy="0 0 0" />
 			<inertial>
 				<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
 				<mass value="0.075" />

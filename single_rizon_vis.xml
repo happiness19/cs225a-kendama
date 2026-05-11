@@ -16,36 +16,31 @@
 
 
 <robotControlConfiguration robotName="Rizon4r"
-	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r.urdf">
+	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r_with_kendama.urdf">
 
 	<logger logFolderName="log_files/single_flexiv_real/controllers"
 		enabledAtStartup="true"
 		addTimestampToFilename="false" />
+
+	<controller name="joint_controller">
+		<jointTask name="joint_task">
+			<velocitySaturation enabled="true" />
+			<otg type="disabled" />
+			<gains kp="400.0" kv="40.0" />
+		</jointTask>
+	</controller>
 
 	<controller name="cartesian_controller">
 		<motionForceTask name="cartesian_task"
 			linkName="flange">
 			<velocitySaturation enabled="true" />
 			<otg type="disabled" />
-			<!-- <positionGains>
-				<kp value="400.0" />
-				<kv value="40.0" />
-			</positionGains> -->
+			<positionGains kp="400.0" kv="40.0" />
 		</motionForceTask>
 
 		<jointTask name="joint_task">
 			<otg type="disabled" />
-			<gains>
-				<kp value="400.0" />
-				<kv value="40.0" />
-			</gains>
-		</jointTask>
-	</controller>
-
-	<controller name="joint_controller">
-		<jointTask name="joint_task">
-			<velocitySaturation enabled="true" />
-			<otg type="disabled" />
+			<gains kp="400.0" kv="40.0" />
 		</jointTask>
 	</controller>
 
