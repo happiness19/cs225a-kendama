@@ -24,18 +24,23 @@
 
 	<controller name="joint_controller">
 		<jointTask name="joint_task">
-			<velocitySaturation enabled="true" />
+			<velocitySaturation enabled="true"
+				velocityLimit="0.2" />
 			<otg type="disabled" />
-			<gains kp="400.0" kv="40.0" />
+			<gains kp="200.0" kv="8.0" />
 		</jointTask>
 	</controller>
 
 	<controller name="cartesian_controller">
 		<motionForceTask name="cartesian_task"
-			linkName="flange">
-			<velocitySaturation enabled="true" />
-			<otg type="disabled" />
-			<positionGains kp="400.0" kv="40.0" />
+			linkName="kendama_big_cup">
+			<velocitySaturation enabled="false"
+				linearVelocityLimit="4.0"
+				angularVelocityLimit="8.0" />
+			<otg type="acceleration"
+				maxVelocity="13.0"
+				maxAcceleration="20.0" />
+			<positionGains kp="700.0" kv="55.0" />
 		</motionForceTask>
 
 		<jointTask name="joint_task">

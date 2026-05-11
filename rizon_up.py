@@ -64,8 +64,8 @@ redis_keys = RedisKeys()
 joint_controller = "joint_controller"
 cartesian_controller = "cartesian_controller"
 
-default_joint_pos = np.array([0.0, -0.6, 0.0, 1.6, 0.0, 1.0, 0.0])
-up_goal_height = 0.8
+default_joint_pos = np.array([0.0, -0.6, 0.0, 1.0, 0.0, 1.0, 0.0])
+up_goal_height = 0.3
 
 joint_integration_threshold = 0.12
 joint_arrival_threshold = 8e-2
