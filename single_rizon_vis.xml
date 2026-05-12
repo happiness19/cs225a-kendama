@@ -16,7 +16,7 @@
 
 
 <robotControlConfiguration robotName="Rizon4r"
-	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r_with_kendama.urdf">
+	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r_with_kendama_perp_y.urdf">
 
 	<logger logFolderName="log_files/single_flexiv_real/controllers"
 		enabledAtStartup="true"
