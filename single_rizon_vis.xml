@@ -38,8 +38,10 @@
 				linearVelocityLimit="4.0"
 				angularVelocityLimit="8.0" />
 			<otg type="acceleration"
-				maxVelocity="13.0"
-				maxAcceleration="20.0" />
+				maxLinearVelocity="4.0"
+				maxAngularVelocity="8.0"
+				maxLinearAcceleration="35.0"
+				maxAngularAcceleration="70.0" />
 			<positionGains kp="700.0" kv="55.0" />
 		</motionForceTask>
 

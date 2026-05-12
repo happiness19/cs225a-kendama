@@ -12,6 +12,7 @@ DEG_TO_RAD = math.pi / 180.0
 class State(Enum):
   RESETTING_JOINTS = auto()
   GOING_UP = auto()
+  STOP = auto()
 
 real_robot_name = "Titania"
 simulation_robot_name = "Rizon4r"
@@ -64,7 +65,9 @@ redis_keys = RedisKeys()
 joint_controller = "joint_controller"
 cartesian_controller = "cartesian_controller"
 
-default_joint_pos = np.array([0.0, -0.6, 0.0, 1.0, 0.0, 1.0, 0.0])
+# Folded-over setup pose. The first three joints rotate the shoulder/elbow
+# plane so the arm curls over instead of sticking straight out horizontally.
+default_joint_pos = np.array([0.0, -0.6, 0.0, 1.6, 0.0, 1.0, 0.0])
 up_goal_height = 0.3
 
 joint_integration_threshold = 0.12
@@ -127,18 +130,19 @@ try:
 
       if joint_error < joint_arrival_threshold:
         print("inside if statement...")
-        current_position = np.array(json.loads(redis_client.get(redis_keys.cartesian_task_current_position)))
-        current_orientation = np.array(json.loads(redis_client.get(redis_keys.cartesian_task_current_orientation)))
-        up_goal_pos = current_position.copy()
-        up_goal_pos[2] = up_goal_height
-        up_goal_ori = current_orientation
+        state = State.STOP
+        # current_position = np.array(json.loads(redis_client.get(redis_keys.cartesian_task_current_position)))
+        # current_orientation = np.array(json.loads(redis_client.get(redis_keys.cartesian_task_current_orientation)))
+        # up_goal_pos = current_position.copy()
+        # up_goal_pos[2] = up_goal_height
+        # up_goal_ori = current_orientation
 
-        set_cartesian_goal(current_position, current_orientation)
-        set_active_controller(cartesian_controller)
-        set_cartesian_goal(up_goal_pos, up_goal_ori)
-        # redis_client.set(redis_keys.joint_task_integration_gain, json.dumps([0.]))
-        state = State.GOING_UP
-        print("Default joint position reached. Going Up")
+        # set_cartesian_goal(current_position, current_orientation)
+        # set_active_controller(cartesian_controller)
+        # set_cartesian_goal(up_goal_pos, up_goal_ori)
+        # # redis_client.set(redis_keys.joint_task_integration_gain, json.dumps([0.]))
+        # state = State.GOING_UP
+        # print("Default joint position reached. Going Up")
 
     elif state == State.GOING_UP:
       # monitor error
@@ -149,6 +153,9 @@ try:
         # set_cartesian_goal(up_goal_pos, up_goal_ori)
         print("Reached 0.8 m height. Stopping.")
         break
+
+    elif state == State.STOP:
+      break
 
 except KeyboardInterrupt:
   print("Keyboard interrupt")
