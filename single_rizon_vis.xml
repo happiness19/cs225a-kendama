@@ -16,7 +16,7 @@
 
 
 <robotControlConfiguration robotName="Rizon4r"
-	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r_with_kendama_perp_y.urdf">
+	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4r_with_kendama_parallel.urdf">
 
 	<logger logFolderName="log_files/single_flexiv_real/controllers"
 		enabledAtStartup="true"
@@ -27,7 +27,7 @@
 			<velocitySaturation enabled="true"
 				velocityLimit="0.2" />
 			<otg type="disabled" />
-			<gains kp="200.0" kv="8.0" />
+			<gains kp="600.0" kv="30.0" />
 		</jointTask>
 	</controller>
 

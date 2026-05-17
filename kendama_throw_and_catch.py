@@ -6,14 +6,14 @@ import math
 import argparse
 from enum import Enum, auto
 from dataclasses import dataclass
-from scipy.spatial.transform import Rotation as R
 
 DEG_TO_RAD = math.pi / 180.0
 
 class State(Enum):
     RESETTING_JOINTS = auto()
     IDLE = auto()
-    THROW = auto()
+    JOLT_UP = auto()
+    JOLT_DOWN = auto()
 
 
 real_robot_name = "Titania"
@@ -55,23 +55,47 @@ cartesian_controller = "cartesian_controller"
 
 # Joint position with end-effector pointing downward
 # Joint 2 and 4 at -90 degrees to point end-effector straight down
-LOWERED_START_JOINT_POS = np.array([0.0, 0.7, 0.0, 1.3, 0.0, 1.5, 1.5])
-default_joint_pos = LOWERED_START_JOINT_POS
+LOWERED_START_JOINT_POS_PERP_Y = np.array([
+    0.0,
+    0.0,
+    0.0,
+    1.57079632679,
+    0.0,
+    0.0,
+    0.0,
+])
 
-# Motion parameters
-motion_duration = 2.0  # seconds for smooth motion
+LOWERED_START_JOINT_POS_PARALLEL_Y = np.array([
+    0.0,
+    0.7853981633974483,
+    0.0,
+    -1.57079632679,
+    0.0,
+    0.7853981633974483,
+    1.57079632679,
+])
+
+default_joint_pos = LOWERED_START_JOINT_POS_PARALLEL_Y
+
+# Motion + timing parameters
 joint_arrival_threshold = 3e-2
+idle_hold_duration = 1.0
+jolt_height = 0.05         # meters cup rises during JOLT_UP
+jolt_up_duration = 0.15     # seconds spent commanding the upward target
+landing_dip = 0.02          # meters cup dips below rest to damp landing
+jolt_down_duration = 0.35   # seconds to hold the dip
+settle_duration = 0.5       # seconds to blend back to rest height
+auto_repeat = False         # set True to loop continuously
 
-# Define absolute world positions for up and down motion
-up_position = np.array([0.248, 0.125, 0.808])  # Starting high position
-down_position = np.array([0.248, 0.125, 0.308])  # Ending low position (0.5m down)
+# Pose bookkeeping
+rest_cup_pos = None
+rest_cup_ori = None
 
 # State tracking
 state = State.RESETTING_JOINTS
-motion_start_time = None
-motion_start_pos = None
-motion_target_pos = None
-motion_orientation = None
+state_entry_time = 0.0
+
+cycle_requested = True  # run one jolt sequence after reset by default
 
 # redis client
 redis_client = redis.Redis()
@@ -89,6 +113,7 @@ if default_joint_pos is None:
 else:
     print("Using lowered start joint pose:", default_joint_pos)
 
+
 def set_cartesian_goal(position, orientation):
     redis_client.set(
         redis_keys.cartesian_task_goal_position,
@@ -99,32 +124,24 @@ def set_cartesian_goal(position, orientation):
         json.dumps(np.asarray(orientation).tolist()),
     )
 
+
 def set_joint_goal(position):
     redis_client.set(redis_keys.joint_task_goal_position, json.dumps(position.tolist()))
-    redis_client.set(redis_keys.joint_task_goal_velocity, json.dumps(np.zeros_like(position).tolist()))
-    redis_client.set(redis_keys.joint_task_goal_acceleration, json.dumps(np.zeros_like(position).tolist()))
+    redis_client.set(
+        redis_keys.joint_task_goal_velocity,
+        json.dumps(np.zeros_like(position).tolist()),
+    )
+    redis_client.set(
+        redis_keys.joint_task_goal_acceleration,
+        json.dumps(np.zeros_like(position).tolist()),
+    )
+
 
 def set_active_controller(controller_name):
     while redis_client.get(redis_keys.active_controller).decode("utf-8") != controller_name:
         redis_client.set(redis_keys.active_controller, controller_name)
         time.sleep(0.001)
 
-def get_ball_position():
-    try:
-        ball_pose_matrix = np.array(json.loads(redis_client.get(redis_keys.ball_pose)))
-        return ball_pose_matrix[0:3, 3]
-    except:
-        return None
-
-def get_ball_velocity():
-    try:
-        ball_velocity = np.array(json.loads(redis_client.get(redis_keys.ball_velocity)))
-        return ball_velocity[0:3]
-    except:
-        return None
-
-def predict_ball_position(*args, **kwargs):
-    raise NotImplementedError("Ball prediction is disabled in idle mode.")
 
 # loop at 200 Hz
 loop_time = 0.0
@@ -134,7 +151,7 @@ time.sleep(0.01)
 init_time = time.perf_counter_ns() * 1e-9
 
 print("=" * 60)
-print("KENDAMA THROW CATCH CONTROLLER")
+print("KENDAMA JOLT CONTROLLER")
 print("=" * 60)
 
 # Start in joint control mode to reset to known position
@@ -150,41 +167,71 @@ try:
         time.sleep(max(0, loop_time - (time.perf_counter_ns() * 1e-9 - init_time)))
 
         if state == State.RESETTING_JOINTS:
-            # Wait for joints to reach default position, then stay idle
             current_joint_position = np.array(
                 json.loads(redis_client.get(redis_keys.joint_task_current_position))
             )
             joint_error = np.linalg.norm(default_joint_pos - current_joint_position)
             if joint_error < joint_arrival_threshold:
-                print("Default joint position reached. Holding pose (idle).")
-                # Briefly activate cartesian controller so kendama_big_cup
-                # current_position gets published to redis.
-                try:
-                    set_active_controller(cartesian_controller)
-                    time.sleep(0.2)
-                    cup_pos = np.array(json.loads(
-                        redis_client.get(redis_keys.cartesian_task_current_position)
-                    ))
-                    cup_ori = np.array(json.loads(
-                        redis_client.get(redis_keys.cartesian_task_current_orientation)
-                    ))
-                    print(f"kendama_big_cup world position: {cup_pos.tolist()}")
-                    print(f"kendama_big_cup world orientation:\n{cup_ori}")
-                    set_active_controller(joint_controller)
-                except Exception as e:
-                    print(f"Could not read big cup position: {e}")
+                print("Default joint position reached. Capturing cup pose and going idle.")
+                set_active_controller(cartesian_controller)
+                time.sleep(0.1)
+                rest_cup_pos = np.array(
+                    json.loads(redis_client.get(redis_keys.cartesian_task_current_position))
+                )
+                rest_cup_ori = np.array(
+                    json.loads(redis_client.get(redis_keys.cartesian_task_current_orientation))
+                )
+                set_cartesian_goal(rest_cup_pos, rest_cup_ori)
+                print(f"kendama_big_cup rest position: {rest_cup_pos.tolist()}")
+                print(f"kendama_big_cup rest orientation:\n{rest_cup_ori}")
                 state = State.IDLE
+                state_entry_time = loop_time
 
         elif state == State.IDLE:
-            # Hold current position - joint controller maintains last goal
-            pass
+            if rest_cup_pos is None:
+                continue
+            set_cartesian_goal(rest_cup_pos, rest_cup_ori)
+            if cycle_requested and (loop_time - state_entry_time) > idle_hold_duration:
+                cycle_requested = auto_repeat  # prevent auto-repeat unless requested
+                state = State.JOLT_UP
+                state_entry_time = loop_time
+                print("Starting JOLT_UP.")
+
+        elif state == State.JOLT_UP:
+            # Pure vertical motion: keep XY and orientation locked to the rest pose.
+            if rest_cup_pos is None:
+                continue
+            up_goal = np.array([rest_cup_pos[0], rest_cup_pos[1], rest_cup_pos[2] + jolt_height])
+            set_cartesian_goal(up_goal, rest_cup_ori)
+            if (loop_time - state_entry_time) > jolt_up_duration:
+                state = State.JOLT_DOWN
+                state_entry_time = loop_time
+                print("Switching to JOLT_DOWN for landing dampening.")
+
+        elif state == State.JOLT_DOWN:
+            # Stay on the same XY column; only move along world Z.
+            if rest_cup_pos is None:
+                continue
+            elapsed = loop_time - state_entry_time
+            dip_z = rest_cup_pos[2] - landing_dip
+            if elapsed < jolt_down_duration:
+                target_z = dip_z
+            elif elapsed < jolt_down_duration + settle_duration:
+                alpha = (elapsed - jolt_down_duration) / settle_duration
+                target_z = dip_z * (1 - alpha) + rest_cup_pos[2] * alpha
+            else:
+                print("Landing dampened. Returning to IDLE.")
+                state = State.IDLE
+                state_entry_time = loop_time
+                continue
+            target = np.array([rest_cup_pos[0], rest_cup_pos[1], target_z])
+            set_cartesian_goal(target, rest_cup_ori)
 
 except KeyboardInterrupt:
-    print("\n\nKeyboard interrupt - stopping simulation")
+    print("\nKeyboard interrupt - stopping controller")
     pass
 except Exception as e:
     print(f"\nError occurred: {e}")
     import traceback
     traceback.print_exc()
     pass
-

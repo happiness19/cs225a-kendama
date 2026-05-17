@@ -399,7 +399,7 @@
         <origin rpy="0.0 0 0" xyz="0.0 0.03 0.21"/>
         <axis xyz="0 1 0"/>
         <limit effort="123" lower="-2.2689" upper="2.2689" velocity="2.0944"/>
-        <calibration rising="0.0"/>
+        <calibration rising="0.7853981633974483"/>
     </joint>
     <joint name="joint3" type="revolute">
         <parent link="link2"/>
@@ -415,7 +415,7 @@
         <origin rpy="0.0 0.0 -3.141592653589793" xyz="-0.02 -0.03 0.19"/>
         <axis xyz="0 1 0"/>
         <limit effort="64" lower="-1.8675" upper="2.6878" velocity="2.4435"/>
-        <calibration rising="1.57079632679"/>
+        <calibration rising="-1.57079632679"/>
     </joint>
     <joint name="joint5" type="revolute">
         <parent link="link4"/>
@@ -431,7 +431,7 @@
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.03 0.19"/>
         <axis xyz="0 1 0"/>
         <limit effort="39" lower="-1.3963" upper="4.5379" velocity="4.8869"/>
-        <calibration rising="0.0"/>
+        <calibration rising="0.7853981633974483"/>
     </joint>
     <joint name="joint7" type="revolute">
         <parent link="link6"/>
@@ -439,7 +439,7 @@
         <origin rpy="0.0 -1.5707963478683205 0.0" xyz="-0.015 0.073 0.11"/>
         <axis xyz="0 0 1"/>
         <limit effort="39" lower="-2.9671" upper="2.9671" velocity="4.8869"/>
-        <calibration rising="0.0"/>
+        <calibration rising="1.57079632679"/>
     </joint>
     <joint name="link7_to_flange" type="fixed">
         <parent link="link7"/>
@@ -464,7 +464,7 @@
     <joint name="end_effector_to_kendama" type="fixed">
         <parent link="end-effector"/>
         <child link="kendama"/>
-        <origin rpy="-1.57079632679 -1.57079632679 0.0" xyz="0.065 0.0 0.0"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.065 0.0 0.0"/>
     </joint>
     <joint name="kendama_to_handle" type="fixed">
         <parent link="kendama"/>
