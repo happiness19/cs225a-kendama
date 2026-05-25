@@ -1,3 +1,5 @@
 opensai.zip
-
+__pycache__
+.venv/
+logs/
 

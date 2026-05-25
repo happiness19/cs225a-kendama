@@ -113,6 +113,11 @@ if default_joint_pos is None:
 else:
     print("Using lowered start joint pose:", default_joint_pos)
 
+def get_pose_from_redis(position_key, orientation_key):
+    position = np.array(json.loads(redis_client.get(position_key)))
+    orientation = np.array(json.loads(redis_client.get(orientation_key)))
+    return position, orientation
+
 
 def set_cartesian_goal(position, orientation):
     redis_client.set(
