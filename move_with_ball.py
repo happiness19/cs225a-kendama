@@ -9,6 +9,7 @@ The script uses Redis keys similar to `kendama_throw_and_catch.py` for cartesian
 """
 import argparse
 import json
+import math
 import time
 import redis
 import numpy as np
@@ -56,6 +57,9 @@ class RedisKeys:
         self.cartesian_task_goal_orientation = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::goal_orientation"
         self.cartesian_task_current_position = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::current_position"
         self.cartesian_task_current_orientation = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::current_orientation"
+        self.joint_task_goal_position = f"opensai::controllers::{robot_name}::joint_controller::joint_task::goal_position"
+        self.joint_task_goal_velocity = f"opensai::controllers::{robot_name}::joint_controller::joint_task::goal_velocity"
+        self.joint_task_goal_acceleration = f"opensai::controllers::{robot_name}::joint_controller::joint_task::goal_acceleration"
         self.active_controller = f"opensai::controllers::{robot_name}::active_controller_name"
 
 
@@ -78,6 +82,25 @@ def set_active_controller(rdb, keys: RedisKeys, controller_name):
         rdb.set(keys.active_controller, controller_name)
 
 
+DEFAULT_LOWERED_JOINTS = np.array([
+    0.0,
+    0.7853981633974483,
+    0.0,
+    -1.57079632679,
+    0.0,
+    0.7853981633974483,
+    1.57079632679,
+])
+
+
+def set_joint_goal(rdb, keys: RedisKeys, positions):
+    positions = np.asarray(positions).tolist()
+    rdb.set(keys.joint_task_goal_position, json.dumps(positions))
+    zero_vel = [0.0] * len(positions)
+    rdb.set(keys.joint_task_goal_velocity, json.dumps(zero_vel))
+    rdb.set(keys.joint_task_goal_acceleration, json.dumps(zero_vel))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--real", action="store_true", help="Run against real robot (Titania) instead of simulation")
@@ -87,6 +110,22 @@ def main():
     parser.add_argument("--host", default="localhost", help="Redis host")
     parser.add_argument("--port", type=int, default=6379, help="Redis port")
     parser.add_argument("--rate", type=float, default=100.0, help="Control loop rate (Hz)")
+    parser.add_argument(
+        "--desired-orientation",
+        default=None,
+        help=(
+            "Fixed orientation quaternion to use (JSON or comma-separated list) instead"
+            " of reading the current cartesian orientation."
+        ),
+    )
+    parser.add_argument(
+        "--control-mode",
+        choices=("cartesian", "joint"),
+        default="cartesian",
+        help="Whether to send cartesian goals (default) or update just joint 0 based on the ball",
+    )
+    parser.add_argument("--base-x", type=float, default=0.0, help="X location that corresponds to joint 0 zero")
+    parser.add_argument("--base-y", type=float, default=0.0, help="Y location that corresponds to joint 0 zero")
     args = parser.parse_args()
 
     robot_name = "Titania" if args.real else "Rizon4r"
@@ -121,6 +160,16 @@ def main():
     except Exception:
         robot_ori = None
 
+    if args.desired_orientation:
+        try:
+            if args.desired_orientation.strip().startswith("["):
+                robot_ori = json.loads(args.desired_orientation)
+            else:
+                robot_ori = [float(x) for x in args.desired_orientation.split(",")]
+        except Exception as exc:
+            print(f"Failed to parse desired orientation: {exc}")
+            return
+
     # If we couldn't read Z or orientation yet, keep trying briefly
     start = time.time()
     while (robot_z is None or robot_ori is None) and (time.time() - start) < 5.0:
@@ -147,6 +196,12 @@ def main():
 
     dt = 1.0 / float(args.rate) if args.rate > 0 else 0.01
 
+    if args.control_mode == "joint":
+        joint_controller = "joint_controller"
+        print("Switching to joint controller so only joint 0 moves.")
+        set_active_controller(rdb, keys, joint_controller)
+        set_joint_goal(rdb, keys, DEFAULT_LOWERED_JOINTS)
+
     try:
         print(f"Following ball key(s): {'pos='+args.pos_key if args.pos_key else args.ball_key}{', ori='+args.ori_key if args.ori_key else ''}")
         while True:
@@ -172,6 +227,14 @@ def main():
 
             if pos is None:
                 # nothing to do this loop
+                time.sleep(dt)
+                continue
+
+            if args.control_mode == "joint":
+                target_angle = math.atan2(pos[1] - args.base_y, pos[0] - args.base_x)
+                target_joints = DEFAULT_LOWERED_JOINTS.copy()
+                target_joints[0] = float(target_angle)
+                set_joint_goal(rdb, keys, target_joints)
                 time.sleep(dt)
                 continue
 
