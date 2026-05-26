@@ -1,25 +1,15 @@
-"""
-Rising Dragon kendama trick (OpenSai / Flexiv Rizon 4r, parallel mount).
+# Step 1:
+# sh scripts/launch.sh config_folder/xml_config_files/single_rizon_real.xml
+# Step 2: run this script 
+# python3 python_examples/rizon_up.py
+# optional argument: --real, that runs the real robot
+# usage: python3 python_examples/rizon_up.py --real, otherwise defaults to simulation
 
-With the kendama mounted in-line with the flange axis, the cup stays at
-a fixed (x, y), oscillates gently up and down, and its orientation swings
-back and forth about the world vertical (z) axis. Because R_z preserves
-the world z-axis, the cup's opening keeps pointing world +z throughout:
-the ball stays seated, and the kendama handle sweeps a horizontal arc
-around the stationary cup.
-
-Bounded swing (theta = A * sin(omega * t)) is used instead of continuous
-rotation. Rotation matrices wrap at 2*pi but joints don't, so continuous
-spin winds the wrist into its limit; sin() bounds the joint travel to
-+/-A and reverses on its own at the extremes (where d theta/dt = 0).
-
-Launch the simulator first:
-    sh scripts/launch.sh single_rizon_vis.xml
-
-Then in a second terminal:
-    python3 rising_dragon.py            # simulation
-    python3 rising_dragon.py --real     # real hardware (deferred)
-"""
+# To run in real:
+# Step 0: 
+# Make sure the robot is powered on and the estop is released. Also make sure to have the safety key with you.
+# Start redis server: src1@src1-GTi:~/OpenSai/drivers/FlexivRizonRedisDriver/redis_driver$ sh launch_titania-4s_gripper_driver.sh 
+# and then do the other thing
 
 import argparse
 import json
