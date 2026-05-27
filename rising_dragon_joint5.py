@@ -9,9 +9,8 @@ import numpy as np
 import redis
 
 
-parser = argparse.ArgumentParser(description="Oscillate one joint while holding the rest fixed.")
+parser = argparse.ArgumentParser(description="Oscillate a couple of joints while holding the rest fixed.")
 parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
-parser.add_argument("--joint-index", type=int, default=5, help="Joint index to sweep (0-based).")
 parser.add_argument("--amplitude", type=float, default=90.0, help="Max swing in degrees (± around starting position).")
 parser.add_argument("--period", type=float, default=10.0, help="Seconds for a full back-and-forth cycle.")
 parser.add_argument("--rate", type=float, default=200.0, help="Command rate in Hz.")
@@ -63,8 +62,9 @@ def main() -> None:
     set_joint_goal(DEFAULT_JOINTS)
     time.sleep(0.2)
 
+    sweep_joints = [0, 4]
     print(
-        f"Sweeping joint {args.joint_index} ±{args.amplitude}° with {args.period}s period at {args.rate}Hz."
+        f"Sweeping joints {sweep_joints} ±{args.amplitude}° with {args.period}s period at {args.rate}Hz."
     )
 
     zero_pose = DEFAULT_JOINTS.copy()
@@ -77,7 +77,8 @@ def main() -> None:
         while True:
             t = time.perf_counter() - start_time
             angle = sweep_rad * math.sin(omega * t)
-            zero_pose[args.joint_index] = angle
+            for joint in sweep_joints:
+                zero_pose[joint] = angle
             set_joint_goal(zero_pose)
             time.sleep(dt)
     except KeyboardInterrupt:
