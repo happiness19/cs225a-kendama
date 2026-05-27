@@ -50,9 +50,27 @@ def parse_pose_raw(raw_bytes):
     return None, None
 
 
+real_robot_name = "Titania"
+simulation_robot_name = "Rizon4r"
+
+real_robot_config_file = "kendama.xml"
+simulation_config_file = "single_rizon_vis.xml"
+parser = argparse.ArgumentParser()
+parser.add_argument("--real", action="store_true", help="Run against the real robot instead of simulation.")
+args = parser.parse_args()
+
+ENV = "real" if args.real else "simulation"
+if ENV == "real":
+  robot_name = "Titania"
+  config_file_for_this_example = real_robot_config_file
+else:
+  robot_name = "Rizon4r"
+  config_file_for_this_example = simulation_config_file
+
+
 @dataclass
 class RedisKeys:
-    def __init__(self, robot_name: str):
+    def __init__(self):
         self.cartesian_task_goal_position = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::goal_position"
         self.cartesian_task_goal_orientation = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::goal_orientation"
         self.cartesian_task_current_position = f"opensai::controllers::{robot_name}::cartesian_controller::cartesian_task::current_position"
@@ -61,26 +79,36 @@ class RedisKeys:
         self.joint_task_goal_velocity = f"opensai::controllers::{robot_name}::joint_controller::joint_task::goal_velocity"
         self.joint_task_goal_acceleration = f"opensai::controllers::{robot_name}::joint_controller::joint_task::goal_acceleration"
         self.active_controller = f"opensai::controllers::{robot_name}::active_controller_name"
+        self.config_file_name = f"::sai-interfaces-webui::config_file_name"
+        self.joint_task_current_position: str = f"opensai::controllers::{robot_name}::joint_controller::joint_task::current_position"
+        self.joint_task_current_orientation: str = f"opensai::controllers::{robot_name}::joint_controller::joint_task::current_orientation"
+        self.joint_task_integration_gain: str = f"opensai::controllers::{robot_name}::joint_controller::joint_task::integration_gain"
 
 
-def set_cartesian_goal(rdb, keys: RedisKeys, position, orientation):
-    rdb.set(keys.cartesian_task_goal_position, json.dumps(np.asarray(position).tolist()))
-    rdb.set(keys.cartesian_task_goal_orientation, json.dumps(np.asarray(orientation).tolist()))
+redis_keys = RedisKeys()
+# redis client
+redis_client = redis.Redis()
 
+# check that the config file is correct
+config_file_name = redis_client.get(redis_keys.config_file_name).decode("utf-8")
+if config_file_name != config_file_for_this_example:
+    print("This example is meant to be used with the config file: ", config_file_for_this_example)
+    print("But instead you have: ", config_file_name)
+    exit(0)
 
-def set_active_controller(rdb, keys: RedisKeys, controller_name):
-    # Try to set until the controller reports as active
-    try:
-        while True:
-            cur = rdb.get(keys.active_controller)
-            if cur is not None and cur.decode("utf-8") == controller_name:
-                break
-            rdb.set(keys.active_controller, controller_name)
-            time.sleep(0.01)
-    except Exception:
-        # if active controller key is missing, still attempt to set once
-        rdb.set(keys.active_controller, controller_name)
+def set_cartesian_goal(position, orientation):
+  redis_client.set(redis_keys.cartesian_task_goal_position, json.dumps(position.tolist()))
+  redis_client.set(redis_keys.cartesian_task_goal_orientation, json.dumps(orientation.tolist()))
 
+def set_joint_goal(position):
+  redis_client.set(redis_keys.joint_task_goal_position, json.dumps(position.tolist()))
+  redis_client.set(redis_keys.joint_task_goal_velocity, json.dumps(np.zeros_like(position).tolist()))
+  redis_client.set(redis_keys.joint_task_goal_acceleration, json.dumps(np.zeros_like(position).tolist()))
+
+def set_active_controller(controller_name):
+  while redis_client.get(redis_keys.active_controller).decode("utf-8") != controller_name:
+    redis_client.set(redis_keys.active_controller, controller_name)
+    time.sleep(0.001)
 
 DEFAULT_LOWERED_JOINTS = np.array([
     0.0,
@@ -91,14 +119,6 @@ DEFAULT_LOWERED_JOINTS = np.array([
     0.7853981633974483,
     1.57079632679,
 ])
-
-
-def set_joint_goal(rdb, keys: RedisKeys, positions):
-    positions = np.asarray(positions).tolist()
-    rdb.set(keys.joint_task_goal_position, json.dumps(positions))
-    zero_vel = [0.0] * len(positions)
-    rdb.set(keys.joint_task_goal_velocity, json.dumps(zero_vel))
-    rdb.set(keys.joint_task_goal_acceleration, json.dumps(zero_vel))
 
 
 def main():
@@ -129,63 +149,30 @@ def main():
     args = parser.parse_args()
 
     robot_name = "Titania" if args.real else "Rizon4r"
-    keys = RedisKeys(robot_name)
-    rdb = redis.Redis(host=args.host, port=args.port)
 
     cartesian_controller = "cartesian_controller"
 
     # Activate cartesian controller and capture robot Z and orientation
     print(f"Activating cartesian controller for {robot_name}...")
-    set_active_controller(rdb, keys, cartesian_controller)
+    set_active_controller(cartesian_controller)
     time.sleep(0.05)
 
     # read current robot pose to preserve Z and orientation
-    cur_pos_raw = rdb.get(keys.cartesian_task_current_position)
-    cur_ori_raw = rdb.get(keys.cartesian_task_current_orientation)
+    cur_pos_raw = np.array(json.loads(redis_client.get(redis_keys.joint_task_current_position)))
+    cur_ori_raw = np.array(json.loads(redis_client.get(redis_keys.joint_task_current_orientation)))
     if cur_pos_raw is None:
         print("Warning: could not read current robot position; will wait until available.")
     # Try to parse
-    robot_z = None
-    robot_ori = None
-    try:
-        if cur_pos_raw is not None:
-            robot_pos = json.loads(cur_pos_raw.decode('utf-8'))
-            robot_z = float(robot_pos[2])
-    except Exception:
-        robot_z = None
-
-    try:
-        if cur_ori_raw is not None:
-            robot_ori = json.loads(cur_ori_raw.decode('utf-8'))
-    except Exception:
-        robot_ori = None
-
-    if args.desired_orientation:
-        try:
-            if args.desired_orientation.strip().startswith("["):
-                robot_ori = json.loads(args.desired_orientation)
-            else:
-                robot_ori = [float(x) for x in args.desired_orientation.split(",")]
-        except Exception as exc:
-            print(f"Failed to parse desired orientation: {exc}")
-            return
+    robot_z = float(cur_pos_raw[2])
+    robot_ori = cur_ori_raw
 
     # If we couldn't read Z or orientation yet, keep trying briefly
     start = time.time()
     while (robot_z is None or robot_ori is None) and (time.time() - start) < 5.0:
-        cur_pos_raw = rdb.get(keys.cartesian_task_current_position)
-        cur_ori_raw = rdb.get(keys.cartesian_task_current_orientation)
-        try:
-            if cur_pos_raw is not None:
-                robot_pos = json.loads(cur_pos_raw.decode('utf-8'))
-                robot_z = float(robot_pos[2])
-        except Exception:
-            robot_z = robot_z
-        try:
-            if cur_ori_raw is not None:
-                robot_ori = json.loads(cur_ori_raw.decode('utf-8'))
-        except Exception:
-            robot_ori = robot_ori
+        robot_pos = redis_client.get(redis_keys.cartesian_task_current_position)
+        robot_z = float(robot_pos[2])
+        robot_ori = redis_client.get(redis_keys.cartesian_task_current_orientation)
+
         time.sleep(0.05)
 
     if robot_z is None or robot_ori is None:
@@ -199,31 +186,36 @@ def main():
     if args.control_mode == "joint":
         joint_controller = "joint_controller"
         print("Switching to joint controller so only joint 0 moves.")
-        set_active_controller(rdb, keys, joint_controller)
-        set_joint_goal(rdb, keys, DEFAULT_LOWERED_JOINTS)
+        set_active_controller(joint_controller)
+        set_joint_goal(DEFAULT_LOWERED_JOINTS)
 
+    ball_key  = "KendamaBall::pos"
     try:
-        print(f"Following ball key(s): {'pos='+args.pos_key if args.pos_key else args.ball_key}{', ori='+args.ori_key if args.ori_key else ''}")
+        print(f"Following ball key(s): {'pos='+args.pos_key if args.pos_key else ball_key}{', ori='+args.ori_key if args.ori_key else ''}")
         while True:
             # read ball pose
             pos = None
             ori = None
             if args.pos_key or args.ori_key:
+                print(f"Reading position from {args.pos_key} and orientation from {args.ori_key}")
                 if args.pos_key:
-                    raw_p = rdb.get(args.pos_key)
+                    raw_p = redis_client.get(args.pos_key)
                     try:
                         pos = json.loads(raw_p.decode('utf-8')) if raw_p is not None else None
                     except Exception:
                         pos = None
                 if args.ori_key:
-                    raw_o = rdb.get(args.ori_key)
+                    raw_o = redis_client.get(args.ori_key)
                     try:
                         ori = json.loads(raw_o.decode('utf-8')) if raw_o is not None else None
                     except Exception:
                         ori = None
             else:
-                raw = rdb.get(args.ball_key)
+                print(f"Reading pose from {ball_key}")
+                raw = redis_client.get(ball_key)
+                print(f"Raw data from Redis: {raw}")
                 pos, ori = parse_pose_raw(raw)
+                print(f"Parsed position: {pos}, orientation: {ori}")
 
             if pos is None:
                 # nothing to do this loop
@@ -234,14 +226,14 @@ def main():
                 target_angle = math.atan2(pos[1] - args.base_y, pos[0] - args.base_x)
                 target_joints = DEFAULT_LOWERED_JOINTS.copy()
                 target_joints[0] = float(target_angle)
-                set_joint_goal(rdb, keys, target_joints)
+                set_joint_goal(target_joints)
                 time.sleep(dt)
                 continue
 
             # construct target: match ball x,y, preserve robot_z
             target = [float(pos[0]), float(pos[1]), float(robot_z)]
             # keep orientation as robot_ori
-            set_cartesian_goal(rdb, keys, target, robot_ori)
+            set_cartesian_goal(target, robot_ori)
             time.sleep(dt)
 
     except KeyboardInterrupt:
