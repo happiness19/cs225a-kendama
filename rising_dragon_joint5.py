@@ -11,9 +11,10 @@ import redis
 
 parser = argparse.ArgumentParser(description="Oscillate a couple of joints while holding the rest fixed.")
 parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
-parser.add_argument("--amplitude", type=float, default=90.0, help="Max swing in degrees (± around starting position).")
 parser.add_argument("--period", type=float, default=10.0, help="Seconds for a full back-and-forth cycle.")
 parser.add_argument("--rate", type=float, default=200.0, help="Command rate in Hz.")
+parser.add_argument("--amplitude-j0", type=float, default=90.0, help="Joint 0 swing in degrees.")
+parser.add_argument("--amplitude-j4", type=float, default=60.0, help="Joint 4 swing in degrees.")
 args = parser.parse_args()
 
 robot_name = "Titania" if args.real else "Rizon4r"
@@ -62,13 +63,13 @@ def main() -> None:
     set_joint_goal(DEFAULT_JOINTS)
     time.sleep(0.2)
 
-    sweep_joints = [0, 4]
+    sweep_joints = {0: args.amplitude_j0, 4: args.amplitude_j4}
     print(
-        f"Sweeping joints {sweep_joints} ±{args.amplitude}° with {args.period}s period at {args.rate}Hz."
+        f"Sweeping joint 0 ±{args.amplitude_j0}° and joint 4 ±{args.amplitude_j4}° with {args.period}s period at {args.rate}Hz."
     )
 
     zero_pose = DEFAULT_JOINTS.copy()
-    sweep_rad = math.radians(args.amplitude)
+    sweep_rad = {joint: math.radians(ampl) for joint, ampl in sweep_joints.items()}
     omega = 2.0 * math.pi / args.period
     dt = 1.0 / args.rate if args.rate > 0 else 0.01
     start_time = time.perf_counter()
@@ -76,9 +77,8 @@ def main() -> None:
     try:
         while True:
             t = time.perf_counter() - start_time
-            angle = sweep_rad * math.sin(omega * t)
-            for joint in sweep_joints:
-                zero_pose[joint] = angle
+            for joint, rad in sweep_rad.items():
+                zero_pose[joint] = rad * math.sin(omega * t)
             set_joint_goal(zero_pose)
             time.sleep(dt)
     except KeyboardInterrupt:
