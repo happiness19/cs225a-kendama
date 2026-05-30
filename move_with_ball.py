@@ -7,14 +7,25 @@ import time
 import numpy as np
 import redis
 
+# DEFAULT_HOME_JOINTS = np.array([
+#     math.radians(0.0),
+#     math.radians(-40.0),
+#     math.radians(0.0),
+#     math.radians(90.0),
+#     math.radians(0.0),
+#     math.radians(40.0),
+#     math.radians(0.0)
+# ])
+
+
 DEFAULT_HOME_JOINTS = np.array([
-    math.radians(0.0),
-    math.radians(-40.0),
-    math.radians(0.0),
-    math.radians(90.0),
-    math.radians(0.0),
-    math.radians(40.0),
-    math.radians(0.0)
+    math.radians(49.22),
+    math.radians(-98.22),
+    math.radians(-97.69),
+    math.radians(83.55),
+    math.radians(98.78),
+    math.radians(-6.29),
+    math.radians(-33.43)
 ])
 
 ROBOT_NAME = "Titania"
