@@ -1,7 +1,7 @@
 <redisConfiguration namespacePrefix="opensai" />
 
 <robotControlConfiguration robotName="Titania"
-	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4R.urdf">
+	robotModelFile="${ROBOT_FILES_FOLDER}/Rizon4s.urdf">
 
 	<controller name="cartesian_controller">
 		<motionForceTask name="cartesian_task"
