@@ -1,9 +1,9 @@
-"""Rising dragon loop: rise, hold at the top, spiral down, repeat.
+"""Rising dragon loop: spiral up, hold at the top, spiral down, repeat.
 
 The robot parks in a low pose, switches to Cartesian control, captures the
 low-pose orientation, then loops forever until Ctrl+C:
 
-    rise -> hold top -> spiral down -> rise -> hold top -> ...
+    spiral up -> hold top -> spiral down -> spiral up -> hold top -> ...
 
 The captured orientation is held throughout the loop so the last link remains
 parallel to the ground while carrying the ball.
@@ -56,17 +56,14 @@ def smoothstep(alpha: float) -> float:
     return alpha * alpha * (3.0 - 2.0 * alpha)
 
 
-def vertical_rise_position(base_pos: np.ndarray, rise_height: float, alpha: float) -> np.ndarray:
-    return base_pos + np.array([0.0, 0.0, rise_height * smoothstep(alpha)])
-
-
-def spiral_down_position(
+def spiral_position(
     base_pos: np.ndarray,
     radius: float,
     rise_height: float,
     turns: float,
     start_angle: float,
     alpha: float,
+    upward: bool,
 ) -> np.ndarray:
     phase = smoothstep(alpha)
     theta = start_angle + 2.0 * math.pi * turns * phase
@@ -76,7 +73,8 @@ def spiral_down_position(
         radius_envelope * math.sin(theta),
         0.0,
     ])
-    z_offset = np.array([0.0, 0.0, rise_height * (1.0 - phase)])
+    z_height = rise_height * phase if upward else rise_height * (1.0 - phase)
+    z_offset = np.array([0.0, 0.0, z_height])
     return base_pos + xy_offset + z_offset
 
 
@@ -102,15 +100,15 @@ def set_active_controller(client: redis.Redis, key: str, name: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Loop a rising Cartesian motion followed by a spiral descent."
+        description="Loop a spiral rise followed by a top hold and spiral descent."
     )
     parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
     parser.add_argument("--rate", type=float, default=DEFAULT_RATE, help="Command rate in Hz.")
-    parser.add_argument("--duration", type=float, default=3.0, help="Seconds spent rising upward.")
-    parser.add_argument("--down-duration", type=float, default=4.0, help="Seconds spent spiraling downward.")
+    parser.add_argument("--duration", type=float, default=3.0, help="Seconds spent spiraling upward.")
+    parser.add_argument("--down-duration", type=float, default=9.0, help="Seconds spent spiraling downward.")
     parser.add_argument("--radius", type=float, default=0.08, help="Maximum spiral radius in meters.")
-    parser.add_argument("--rise-height", type=float, default=0.22, help="Total upward travel in meters.")
-    parser.add_argument("--turns", type=float, default=1.5, help="Number of spiral revolutions during descent.")
+    parser.add_argument("--rise-height", type=float, default=0.32, help="Total upward travel in meters.")
+    parser.add_argument("--turns", type=float, default=3.5, help="Number of spiral revolutions during each up/down phase.")
     parser.add_argument("--start-angle-deg", type=float, default=0.0, help="Initial phase of the spiral.")
     parser.add_argument("--hold-top", type=float, default=1.0, help="Seconds to hold the top pose before spiraling down.")
     parser.add_argument(
@@ -191,14 +189,22 @@ def main() -> None:
                 set_vec(client, key_goal_ori, level_ori)
 
                 print(f"Loop base center: {np.round(center_pos, 4).tolist()}")
-                print("Starting rise -> hold-top -> spiral-down loop. Ctrl+C to stop.")
+                print("Starting spiral-up -> hold-top -> spiral-down loop. Ctrl+C to stop.")
                 phase_start_time = time.perf_counter()
                 state = State.RISING_UP
 
             elif state == State.RISING_UP:
                 elapsed = time.perf_counter() - phase_start_time
                 alpha = elapsed / args.duration
-                goal_pos = vertical_rise_position(center_pos, args.rise_height, alpha)
+                goal_pos = spiral_position(
+                    center_pos,
+                    args.radius,
+                    args.rise_height,
+                    args.turns,
+                    start_angle + cycle_count * 4.0 * math.pi * args.turns,
+                    alpha,
+                    upward=True,
+                )
 
                 set_vec(client, key_goal_pos, goal_pos)
                 set_vec(client, key_goal_ori, level_ori)
@@ -221,13 +227,14 @@ def main() -> None:
             elif state == State.SPIRALING_DOWN:
                 elapsed = time.perf_counter() - phase_start_time
                 alpha = elapsed / args.down_duration
-                goal_pos = spiral_down_position(
+                goal_pos = spiral_position(
                     center_pos,
                     args.radius,
                     args.rise_height,
                     args.turns,
-                    start_angle + cycle_count * 2.0 * math.pi * args.turns,
+                    start_angle + (cycle_count * 4.0 + 2.0) * math.pi * args.turns,
                     alpha,
+                    upward=False,
                 )
 
                 set_vec(client, key_goal_pos, goal_pos)
