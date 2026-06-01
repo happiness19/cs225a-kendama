@@ -21,10 +21,10 @@ ROBOT_NAME = "Titania"
 
 MAX_Z = 0.319234  # Z ceiling — robot will not move above this height
 MIN_Z = 0.05      # Z floor  — robot will not move below this height
-MIN_Y = -0.35
-MAX_Y = 0.35
-MIN_X = 0.4
-MAX_X = 0.8
+MIN_Y = -0.5
+MAX_Y = 0.5
+MIN_X = 0.5
+MAX_X = 0.9
 
 # How often (in cycles) to print status. At 100 Hz, 10 → print every 100 ms.
 PRINT_EVERY_N_CYCLES = 10
@@ -421,7 +421,7 @@ def main():
     parser.add_argument("--max-step", type=float, default=0.003,
                         help="Maximum Cartesian motion per cycle (meters).")
     # FIX: cup-z promoted to CLI argument — no more hardcoded constant to edit.
-    parser.add_argument("--cup-z",    type=float, default=0.2,
+    parser.add_argument("--cup-z",    type=float, default=0.4,
                         help="Z height of the cup/catch target (meters). "
                              "⚠️  Measure and set this accurately before running.")
     args = parser.parse_args()
