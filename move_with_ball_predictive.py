@@ -32,8 +32,13 @@ PRINT_EVERY_N_CYCLES = 10
 # Max in-flight samples before auto-resetting (2 s @ 100 Hz = 200).
 MAX_FLIGHT_FRAMES = 200
 
-# Consecutive "held" frames required before recomputing the EE→ball offset.
+# Consecutive "held" frames required before checking EE-ball offset drift.
 OFFSET_REGEN_FRAMES = 30
+
+# Warn if the measured EE-ball separation has drifted this far from the
+# offset captured at startup. Do not automatically learn the drift into the
+# controller target.
+OFFSET_DRIFT_WARN_THRESHOLD = 0.03
 
 
 def make_keys(robot_name):
@@ -282,9 +287,11 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
     if ee_pos is None or ee_ori is None or ball_pos is None:
         raise RuntimeError("Could not read EE pose or ball position from Redis.")
 
-    # Offset = vector from ball to EE when "held".
-    # Recomputed automatically after each catch/reset.
+    # Offset = vector from ball to EE at startup. Keep this fixed; if we
+    # overwrite it after a missed catch or while the robot is still catching up,
+    # the controller learns the tracking error as the new desired offset.
     offset    = ee_pos - ball_pos
+    initial_offset = offset.copy()
     fixed_ori = ee_ori.copy()
     target    = ee_pos.copy()
 
@@ -292,7 +299,7 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
     ball_history: list = []
     landing_target   = None
     prev_state       = "held"
-    held_stable_count  = 0   # frames consecutively in held (offset regen)
+    held_stable_count  = 0   # frames consecutively in held (offset drift check)
     flight_cycle_count = 0   # frames since throw confirmed (latency fix)
     cycle              = 0   # for rate-limiting prints
     throw_state        = "held"
@@ -324,11 +331,16 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
 
             if throw_state == "held":
                 held_stable_count += 1
-                # FIX: recompute offset after enough stable held frames so it
-                # stays valid across multiple catch-and-reset cycles.
                 if held_stable_count == OFFSET_REGEN_FRAMES:
-                    offset = ee_pos - ball_pos
-                    print(f"[Track] Offset recomputed: {offset}")
+                    measured_offset = ee_pos - ball_pos
+                    drift = np.linalg.norm(measured_offset - initial_offset)
+                    if drift > OFFSET_DRIFT_WARN_THRESHOLD:
+                        print(
+                            "[Track] Offset drift warning: "
+                            f"initial={np.round(initial_offset, 4)} "
+                            f"measured={np.round(measured_offset, 4)} "
+                            f"drift={drift:.4f} m. Keeping initial offset."
+                        )
                 landing_target = None
                 desired = ball_pos + offset
 
