@@ -28,16 +28,28 @@ from enum import Enum, auto
 import numpy as np
 import redis
 
+# HOME BASE POSITION
+# LOWERED_START_JOINTS = np.array([
+#     0.0,
+#     -1.1,
+#     0.0,
+#     1.57079632679,
+#     0.0,
+#     2.8,
+#     0.0,
+# ])
 
+# FLAT ELBOW POSITION
 LOWERED_START_JOINTS = np.array([
-    0.0,
-    -1.1,
-    0.0,
-    1.57079632679,
-    0.0,
-    2.8,
-    0.0,
+    math.radians(49.22),
+    math.radians(-98.22),
+    math.radians(-97.69),
+    math.radians(83.55),
+    math.radians(98.78),
+    math.radians(-6.29),
+    math.radians(-33.43)
 ])
+
 
 JOINT_ARRIVAL_TOL = 0.2
 DEFAULT_RATE = 200.0
