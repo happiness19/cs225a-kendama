@@ -40,6 +40,15 @@ OFFSET_REGEN_FRAMES = 30
 # controller target.
 OFFSET_DRIFT_WARN_THRESHOLD = 0.03
 
+# Post-catch damping. This is only entered after the ball is aligned with the
+# EE/head at the fixed catch plane; normal tracking never commands this dip.
+CATCH_XY_ALIGNMENT_THRESHOLD = 0.035
+CATCH_Z_WINDOW = 0.05
+CATCH_DESCENT_VELOCITY_THRESHOLD = -0.02
+POST_CATCH_DROP = 0.02
+POST_CATCH_DROP_HOLD = 0.25
+POST_CATCH_SETTLE = 0.35
+
 
 def make_keys(robot_name):
     base = f"opensai::controllers::{robot_name}"
@@ -294,6 +303,7 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
     initial_offset = offset.copy()
     fixed_ori = ee_ori.copy()
     target    = ee_pos.copy()
+    catch_z   = float(np.clip(cup_z, MIN_Z, MAX_Z))
 
     detector         = ThrowDetector(dt=dt)
     ball_history: list = []
@@ -303,12 +313,18 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
     flight_cycle_count = 0   # frames since throw confirmed (latency fix)
     cycle              = 0   # for rate-limiting prints
     throw_state        = "held"
+    post_catch_phase   = None
+    post_catch_elapsed = 0.0
+    post_catch_target  = None
+    post_catch_done    = False
 
     print(f"EE position  : {ee_pos}")
     print(f"Ball position: {ball_pos}")
     print(f"Offset       : {offset}")
     print(f"Z ceiling    : {MAX_Z}  Z floor: {MIN_Z}")
     print(f"Cup Z        : {cup_z}")
+    if catch_z != cup_z:
+        print(f"Effective catch Z after workspace clamp: {catch_z}")
     print("Tracking ball — press Ctrl+C to stop.")
 
     while True:
@@ -323,13 +339,68 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
             if prev_state == "held" and throw_state in ("throwing", "in_flight"):
                 ball_history.clear()
                 flight_cycle_count = 0
+                post_catch_phase = None
+                post_catch_elapsed = 0.0
+                post_catch_target = None
+                post_catch_done = False
                 print("[Track] Ball history cleared for fresh prediction.")
 
             ball_history.append(ball_pos.copy())
             if len(ball_history) > 40:   # ~400 ms @ 100 Hz
                 ball_history.pop(0)
 
-            if throw_state == "held":
+            catch_xy_error = np.linalg.norm(ball_pos[:2] - ee_pos[:2])
+            catch_z_error = abs(ball_pos[2] - catch_z)
+            catch_vz = 0.0
+            if len(ball_history) >= 2:
+                catch_vz = (ball_history[-1][2] - ball_history[-2][2]) / dt
+            caught = (
+                post_catch_phase is None
+                and not post_catch_done
+                and throw_state == "in_flight"
+                and catch_xy_error < CATCH_XY_ALIGNMENT_THRESHOLD
+                and catch_z_error < CATCH_Z_WINDOW
+                and catch_vz < CATCH_DESCENT_VELOCITY_THRESHOLD
+            )
+            if caught:
+                post_catch_phase = "drop"
+                post_catch_elapsed = 0.0
+                post_catch_target = target.copy()
+                post_catch_target[:2] = ee_pos[:2]
+                post_catch_target[2] = catch_z
+                post_catch_done = True
+                landing_target = None
+                print(
+                    "[Catch] XY aligned at catch plane; starting Z drop. "
+                    f"xy_error={catch_xy_error:.4f} m "
+                    f"z_error={catch_z_error:.4f} m vz={catch_vz:.4f} m/s"
+                )
+
+            if post_catch_phase is not None:
+                held_stable_count = 0
+                post_catch_elapsed += dt
+                drop_z = post_catch_target[2] - POST_CATCH_DROP
+                if post_catch_elapsed < POST_CATCH_DROP_HOLD:
+                    desired = post_catch_target.copy()
+                    desired[2] = drop_z
+                elif post_catch_elapsed < POST_CATCH_DROP_HOLD + POST_CATCH_SETTLE:
+                    alpha = (post_catch_elapsed - POST_CATCH_DROP_HOLD) / POST_CATCH_SETTLE
+                    desired = post_catch_target.copy()
+                    desired[2] = drop_z * (1.0 - alpha) + post_catch_target[2] * alpha
+                else:
+                    print("[Catch] Z drop complete; returning to normal tracking.")
+                    detector.reset()
+                    throw_state = "held"
+                    prev_state = "held"
+                    ball_history.clear()
+                    landing_target = None
+                    held_stable_count = 0
+                    post_catch_phase = None
+                    post_catch_elapsed = 0.0
+                    post_catch_target = None
+                    desired = ball_pos + offset
+
+            elif throw_state == "held":
                 held_stable_count += 1
                 if held_stable_count == OFFSET_REGEN_FRAMES:
                     measured_offset = ee_pos - ball_pos
@@ -349,7 +420,7 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
                 flight_cycle_count += 1
                 if landing_target is None:
                     landing_target = predict_landing(
-                        ball_history, target_z=cup_z, dt=dt,
+                        ball_history, target_z=catch_z, dt=dt,
                         elapsed_cycles=flight_cycle_count
                     )
                     if landing_target is not None:
@@ -361,7 +432,7 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
                 flight_cycle_count += 1
                 # Continuously refine prediction as new data arrives
                 refined = predict_landing(
-                    ball_history, target_z=cup_z, dt=dt,
+                    ball_history, target_z=catch_z, dt=dt,
                     elapsed_cycles=flight_cycle_count
                 )
                 if refined is not None:
