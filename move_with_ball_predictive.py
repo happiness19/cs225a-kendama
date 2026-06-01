@@ -363,9 +363,17 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
 
             # FIX: clamp Z between MIN_Z and MAX_Z (not ee_pos[2]) so the
             # robot can descend to the cup height during a catch.
-            desired[0] = np.clip(desired[0], MIN_X, MAX_X)
-            desired[1] = np.clip(desired[1], MIN_Y, MAX_Y)
-            desired[2] = np.clip(desired[2], MIN_Z, MAX_Z)
+
+            # desired[0] = np.clip(desired[0], MIN_X, MAX_X)
+            desired[0] = min(desired[0], MAX_X)  # Clamp X to workspace
+            desired[0] = max(desired[0], MIN_X)  # Clamp X to workspace
+            desired[1] = min(desired[1], MAX_Y)  # Clamp Y to workspace
+            desired[1] = max(desired[1], MIN_Y)  # Clamp Y to workspace
+            desired[2] = min(desired[2], MAX_Z) # Clamp Z to ceiling
+            desired[2] = max(desired[2], MIN_Z) # Clamp Z to floor
+
+            # desired[1] = np.clip(desired[1], MIN_Y, MAX_Y)
+            # desired[2] = np.clip(desired[2], MIN_Z, MAX_Z)
 
             delta = desired - target
             dist  = np.linalg.norm(delta)
@@ -379,7 +387,9 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
 
         # FIX: rate-limited print — avoids flooding stdout at 100 Hz
         cycle += 1
+        
         if cycle % PRINT_EVERY_N_CYCLES == 0:
+            print("Offset:", offset)
             print(
                 f"[{throw_state:10s}] "
                 f"EE={np.round(ee_pos, 3) if ee_pos is not None else 'N/A'}  "
