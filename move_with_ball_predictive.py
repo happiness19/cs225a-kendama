@@ -200,8 +200,8 @@ class ThrowDetector:
 def predict_landing(ball_positions: list, target_z: float, dt: float,
                     elapsed_cycles: int = 0):
     """
-    Predict where the ball will cross a fixed Z plane, using least-squares
-    projectile fitting over the recent position window.
+    Predict where the ball will cross a fixed Z catch plane while descending,
+    using least-squares projectile fitting over the recent position window.
 
     Parameters
     ----------
@@ -218,7 +218,8 @@ def predict_landing(ball_positions: list, target_z: float, dt: float,
 
     Returns
     -------
-    np.ndarray [x, y, target_z] or None
+    np.ndarray [x, y, target_z] or None. Returns None until the fitted
+    trajectory has a future descending crossing of the catch plane.
     """
     if len(ball_positions) < 3:
         return None
@@ -260,10 +261,11 @@ def predict_landing(ball_positions: list, target_z: float, dt: float,
     t2 = (-b_coef + sqrt_disc) / (2 * a_coef)
 
     candidates = [s for s in [t1, t2] if s > 0]
-    if not candidates:
+    descending = [s for s in candidates if vz - G * s < 0]
+    if not descending:
         return None
 
-    s = min(candidates)
+    s = min(descending)
     return np.array([x_now + vx * s, y_now + vy * s, target_z])
 
 
