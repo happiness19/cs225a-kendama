@@ -31,15 +31,15 @@ import redis
 
 LOWERED_START_JOINTS = np.array([
     0.0,
-    -0.6981317007977318,
+    -1.1,
     0.0,
     1.57079632679,
     0.0,
-    2.2689280275926285,
+    2.8,
     0.0,
 ])
 
-JOINT_ARRIVAL_TOL = 3e-2
+JOINT_ARRIVAL_TOL = 0.2
 DEFAULT_RATE = 200.0
 
 
@@ -115,8 +115,8 @@ def main() -> None:
     parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
     parser.add_argument("--rate", type=float, default=DEFAULT_RATE, help="Command rate in Hz.")
     parser.add_argument("--duration", type=float, default=9.0, help="Seconds spent on each spiral up/down phase.")
-    parser.add_argument("--radius", type=float, default=0.08, help="Maximum spiral radius in meters.")
-    parser.add_argument("--rise-height", type=float, default=0.32, help="Total upward travel in meters.")
+    parser.add_argument("--radius", type=float, default=1.5, help="Maximum spiral radius in meters.")
+    parser.add_argument("--rise-height", type=float, default=0.2, help="Total upward travel in meters.")
     parser.add_argument("--turns", type=float, default=3.5, help="Number of spiral revolutions during each up/down phase.")
     parser.add_argument("--start-angle-deg", type=float, default=0.0, help="Initial phase of the spiral.")
     parser.add_argument("--hold-top", type=float, default=1.0, help="Seconds to hold the top pose before spiraling down.")
@@ -194,6 +194,7 @@ def main() -> None:
             time.sleep(dt)
 
             if state == State.RESETTING_JOINTS:
+                print("Waiting for the robot to reach the lowered start pose...")
                 q = load_json_vec(client, key_joint_current, "current joint position")
                 joint_error = np.linalg.norm(LOWERED_START_JOINTS - q)
                 if joint_error < JOINT_ARRIVAL_TOL:
