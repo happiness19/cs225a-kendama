@@ -34,6 +34,16 @@ DEFAULT_JOINTS = np.array([
     0.0,
 ])
 
+# DEFAULT_HOME_JOINTS = np.array([
+#     math.radians(49.22),
+#     math.radians(-98.22),
+#     math.radians(-97.69),
+#     math.radians(83.55),
+#     math.radians(98.78),
+#     math.radians(-6.29),
+#     math.radians(-33.43)
+# ])
+
 redis_client = redis.Redis()
 
 
@@ -62,6 +72,7 @@ def main() -> None:
     print("Switching to joint controller and parking in the lowered pose...")
     set_joint_goal(DEFAULT_JOINTS)
     time.sleep(0.2)
+    print("Switching to joint controller and parking in the lowered pose...")
 
     sweep_joints = {0: args.amplitude_j0, 4: args.amplitude_j4, 6: 35.0}  # joint index to amplitude in degrees
 

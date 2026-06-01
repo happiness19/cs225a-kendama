@@ -21,10 +21,10 @@ ROBOT_NAME = "Titania"
 
 MAX_Z = 0.319234  # Z ceiling — robot will not move above this height
 MIN_Z = 0.05      # Z floor  — robot will not move below this height
-MIN_Y = -0.5
-MAX_Y = 0.5
-MIN_X = 0.5
-MAX_X = 0.9
+MIN_Y = -0.35
+MAX_Y = 0.35
+MIN_X = 0.4
+MAX_X = 0.8
 
 # How often (in cycles) to print status. At 100 Hz, 10 → print every 100 ms.
 PRINT_EVERY_N_CYCLES = 10

@@ -1,7 +1,7 @@
 <redisConfiguration namespacePrefix="opensai" />
 
 <simvizConfiguration
-	worldFilePath="${WORLD_FILES_FOLDER}/world_single_rizon.urdf">
+	worldFilePath="${WORLD_FILES_FOLDER}/world_single_rizon_para_kendama.urdf">
 
 	<simParameters frictionCoefficient="0.5" />
 
