@@ -104,7 +104,7 @@ def main() -> None:
     )
     parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
     parser.add_argument("--rate", type=float, default=DEFAULT_RATE, help="Command rate in Hz.")
-    parser.add_argument("--duration", type=float, default=3.0, help="Seconds spent spiraling upward.")
+    parser.add_argument("--duration", type=float, default=9.0, help="Seconds spent spiraling upward.")
     parser.add_argument("--down-duration", type=float, default=9.0, help="Seconds spent spiraling downward.")
     parser.add_argument("--radius", type=float, default=0.08, help="Maximum spiral radius in meters.")
     parser.add_argument("--rise-height", type=float, default=0.32, help="Total upward travel in meters.")
@@ -119,8 +119,6 @@ def main() -> None:
     args = parser.parse_args()
     if args.duration <= 0.0:
         raise ValueError("--duration must be positive")
-    if args.down_duration <= 0.0:
-        raise ValueError("--down-duration must be positive")
     if args.hold_top < 0.0:
         raise ValueError("--hold-top must be non-negative for the repeating loop")
 
@@ -157,7 +155,7 @@ def main() -> None:
     print(
         f"radius={args.radius:.3f} m, rise={args.rise_height:.3f} m, "
         f"turns={args.turns:.2f}, rise_duration={args.duration:.2f} s, "
-        f"down_duration={args.down_duration:.2f} s, hold_top={args.hold_top:.2f} s"
+        f"down_duration={args.duration:.2f} s, hold_top={args.hold_top:.2f} s"
     )
     print("The low-pose orientation is held fixed so the last link stays level.")
     print("=" * 60)
@@ -226,7 +224,7 @@ def main() -> None:
 
             elif state == State.SPIRALING_DOWN:
                 elapsed = time.perf_counter() - phase_start_time
-                alpha = elapsed / args.down_duration
+                alpha = elapsed / args.duration
                 goal_pos = spiral_position(
                     center_pos,
                     args.radius,
