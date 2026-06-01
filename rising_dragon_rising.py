@@ -67,7 +67,7 @@ def spiral_position(
 ) -> np.ndarray:
     phase = smoothstep(alpha)
     theta = start_angle + 2.0 * math.pi * turns * phase
-    radius_envelope = radius * math.sin(math.pi * phase)
+    radius_envelope = radius * math.sin(math.pi * phase) ** 2
     xy_offset = np.array([
         radius_envelope * math.cos(theta),
         radius_envelope * math.sin(theta),
@@ -76,6 +76,16 @@ def spiral_position(
     z_height = rise_height * phase if upward else rise_height * (1.0 - phase)
     z_offset = np.array([0.0, 0.0, z_height])
     return base_pos + xy_offset + z_offset
+
+
+def limited_step(current: np.ndarray, desired: np.ndarray, max_step: float) -> np.ndarray:
+    if max_step <= 0.0:
+        return desired
+    delta = desired - current
+    dist = np.linalg.norm(delta)
+    if dist <= max_step:
+        return desired
+    return current + delta * (max_step / dist)
 
 
 def load_json_vec(client: redis.Redis, key: str, label: str) -> np.ndarray:
@@ -104,13 +114,24 @@ def main() -> None:
     )
     parser.add_argument("--real", action="store_true", help="Use the real robot (Titania) instead of the simulator.")
     parser.add_argument("--rate", type=float, default=DEFAULT_RATE, help="Command rate in Hz.")
-    parser.add_argument("--duration", type=float, default=9.0, help="Seconds spent spiraling upward.")
-    parser.add_argument("--down-duration", type=float, default=9.0, help="Seconds spent spiraling downward.")
+    parser.add_argument("--duration", type=float, default=9.0, help="Seconds spent on each spiral up/down phase.")
     parser.add_argument("--radius", type=float, default=0.08, help="Maximum spiral radius in meters.")
     parser.add_argument("--rise-height", type=float, default=0.32, help="Total upward travel in meters.")
     parser.add_argument("--turns", type=float, default=3.5, help="Number of spiral revolutions during each up/down phase.")
     parser.add_argument("--start-angle-deg", type=float, default=0.0, help="Initial phase of the spiral.")
     parser.add_argument("--hold-top", type=float, default=1.0, help="Seconds to hold the top pose before spiraling down.")
+    parser.add_argument(
+        "--max-step",
+        type=float,
+        default=0.0005,
+        help="Maximum Cartesian goal movement per command cycle in meters; set <=0 to disable.",
+    )
+    parser.add_argument(
+        "--arrival-tol",
+        type=float,
+        default=0.003,
+        help="Cartesian goal arrival tolerance in meters for top/bottom phase changes.",
+    )
     parser.add_argument(
         "--no-return",
         action="store_true",
@@ -121,6 +142,8 @@ def main() -> None:
         raise ValueError("--duration must be positive")
     if args.hold_top < 0.0:
         raise ValueError("--hold-top must be non-negative for the repeating loop")
+    if args.arrival_tol < 0.0:
+        raise ValueError("--arrival-tol must be non-negative")
 
     robot_name = "Titania" if args.real else "Rizon4r"
     prefix = f"opensai::controllers::{robot_name}"
@@ -147,6 +170,7 @@ def main() -> None:
     center_pos = None
     level_ori = None
     goal_pos = None
+    command_pos = None
     cycle_count = 0
     start_angle = math.radians(args.start_angle_deg)
 
@@ -154,8 +178,9 @@ def main() -> None:
     print(f"RISING DRAGON LOOP - {robot_name} ({'real' if args.real else 'sim'})")
     print(
         f"radius={args.radius:.3f} m, rise={args.rise_height:.3f} m, "
-        f"turns={args.turns:.2f}, rise_duration={args.duration:.2f} s, "
-        f"down_duration={args.duration:.2f} s, hold_top={args.hold_top:.2f} s"
+        f"turns={args.turns:.2f}, duration={args.duration:.2f} s, "
+        f"hold_top={args.hold_top:.2f} s, "
+        f"max_step={args.max_step:.4f} m, arrival_tol={args.arrival_tol:.4f} m"
     )
     print("The low-pose orientation is held fixed so the last link stays level.")
     print("=" * 60)
@@ -182,6 +207,7 @@ def main() -> None:
                 center_pos = load_json_vec(client, key_current_pos, "current Cartesian position")
                 level_ori = load_json_vec(client, key_current_ori, "current Cartesian orientation")
                 goal_pos = center_pos.copy()
+                command_pos = center_pos.copy()
 
                 set_vec(client, key_goal_pos, center_pos)
                 set_vec(client, key_goal_ori, level_ori)
@@ -194,7 +220,7 @@ def main() -> None:
             elif state == State.RISING_UP:
                 elapsed = time.perf_counter() - phase_start_time
                 alpha = elapsed / args.duration
-                goal_pos = spiral_position(
+                desired_pos = spiral_position(
                     center_pos,
                     args.radius,
                     args.rise_height,
@@ -203,18 +229,22 @@ def main() -> None:
                     alpha,
                     upward=True,
                 )
+                command_pos = limited_step(command_pos, desired_pos, args.max_step)
+                goal_pos = command_pos
 
                 set_vec(client, key_goal_pos, goal_pos)
                 set_vec(client, key_goal_ori, level_ori)
 
-                if alpha >= 1.0:
+                top_pos = center_pos + np.array([0.0, 0.0, args.rise_height])
+                if alpha >= 1.0 and np.linalg.norm(command_pos - top_pos) <= args.arrival_tol:
                     hold_start_time = time.perf_counter()
                     state = State.HOLDING_TOP
                     print(f"Cycle {cycle_count + 1}: reached top {np.round(goal_pos, 4).tolist()}")
 
             elif state == State.HOLDING_TOP:
                 top_pos = center_pos + np.array([0.0, 0.0, args.rise_height])
-                goal_pos = top_pos
+                command_pos = limited_step(command_pos, top_pos, args.max_step)
+                goal_pos = command_pos
                 set_vec(client, key_goal_pos, goal_pos)
                 set_vec(client, key_goal_ori, level_ori)
                 if time.perf_counter() - hold_start_time >= args.hold_top:
@@ -225,7 +255,7 @@ def main() -> None:
             elif state == State.SPIRALING_DOWN:
                 elapsed = time.perf_counter() - phase_start_time
                 alpha = elapsed / args.duration
-                goal_pos = spiral_position(
+                desired_pos = spiral_position(
                     center_pos,
                     args.radius,
                     args.rise_height,
@@ -234,11 +264,13 @@ def main() -> None:
                     alpha,
                     upward=False,
                 )
+                command_pos = limited_step(command_pos, desired_pos, args.max_step)
+                goal_pos = command_pos
 
                 set_vec(client, key_goal_pos, goal_pos)
                 set_vec(client, key_goal_ori, level_ori)
 
-                if alpha >= 1.0:
+                if alpha >= 1.0 and np.linalg.norm(command_pos - center_pos) <= args.arrival_tol:
                     cycle_count += 1
                     print(f"Cycle {cycle_count}: spiral down complete, rising again.")
                     phase_start_time = time.perf_counter()
