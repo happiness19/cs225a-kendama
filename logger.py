@@ -11,7 +11,7 @@ import redis
 DEFAULT_ROBOT_NAME = "Titania"
 DEFAULT_ROBOT_SN = "Rizon4R_062043"
 DEFAULT_RATE_HZ = 150.0
-DEFAULT_DURATION_SEC = 120.0
+DEFAULT_DURATION_SEC = 30.0
 
 
 def vec(values) -> str:
