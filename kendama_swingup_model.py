@@ -110,6 +110,7 @@ class SwingParams:
     catch_xy_window: float = 0.045
     catch_height_window: float = 0.08
     catch_time_horizon: float = 0.90
+    catch_prediction_dt: float = 0.005
     catch_target_timeout: float = 0.20
     damp_drop: float = 0.025
     damp_time: float = 0.25
@@ -126,6 +127,17 @@ class CatchTarget:
     cup_center_w: np.ndarray
     crossing_time: float
     updated_at: float
+
+
+@dataclass
+class CatchFeasibility:
+    feasible: bool
+    reason: str
+    desired_flange_w: np.ndarray | None
+    displacement_from_base: float | None
+    remaining_distance: float | None
+    required_flange_speed: float | None
+    available_flange_speed: float
 
 
 @dataclass
@@ -742,6 +754,61 @@ def catch_cup_target(
     return target, crossing_time
 
 
+def taut_pendulum_catch_target(
+    anchor_w: np.ndarray,
+    state: PendulumState,
+    cup_height: float,
+    geometry: KendamaGeometry,
+    params: SwingParams,
+    swing_axis_world: np.ndarray,
+    horizon: float,
+) -> tuple[np.ndarray, float] | None:
+    target_ball_height = cup_height + geometry.ball_center_above_cup
+    dt = min(max(params.catch_prediction_dt, 1e-4), horizon)
+    prediction_state = PendulumState(state.theta, state.theta_dot)
+    previous_ball = ball_position_from_state(anchor_w, prediction_state, params, swing_axis_world)
+    previous_time = 0.0
+    elapsed = 0.0
+
+    while elapsed < horizon:
+        step = min(dt, horizon - elapsed)
+        next_state = step_taut_pendulum(
+            prediction_state,
+            np.zeros(3),
+            params,
+            swing_axis_world,
+            step,
+        )
+        next_time = elapsed + step
+        next_ball = ball_position_from_state(anchor_w, next_state, params, swing_axis_world)
+        next_ball_velocity = ball_velocity_from_state(next_state, params, swing_axis_world)
+
+        crosses = previous_ball[2] >= target_ball_height and next_ball[2] <= target_ball_height
+        descending = next_ball_velocity[2] < -0.05
+        if crosses and descending:
+            dz = previous_ball[2] - next_ball[2]
+            alpha = 1.0 if abs(dz) < 1e-12 else (previous_ball[2] - target_ball_height) / dz
+            alpha = float(np.clip(alpha, 0.0, 1.0))
+            crossing_time = previous_time + alpha * (next_time - previous_time)
+            crossing_ball = previous_ball + alpha * (next_ball - previous_ball)
+            target = np.array(
+                [
+                    crossing_ball[0],
+                    crossing_ball[1],
+                    cup_height,
+                ],
+                dtype=float,
+            )
+            return target, crossing_time
+
+        prediction_state = next_state
+        previous_ball = next_ball
+        previous_time = next_time
+        elapsed = next_time
+
+    return None
+
+
 def update_catch_latch(
     prediction: tuple[np.ndarray, float] | None,
     previous: CatchTarget | None,
@@ -754,6 +821,97 @@ def update_catch_latch(
     if previous is not None and now - previous.updated_at <= timeout:
         return previous
     return None
+
+
+def evaluate_catch_feasibility(
+    cup_target_w: np.ndarray,
+    crossing_time: float,
+    current_flange_goal: np.ndarray,
+    base_flange_position: np.ndarray,
+    flange_rotation_wf: np.ndarray,
+    geometry: KendamaGeometry,
+    max_step: float,
+    max_displacement: float,
+    command_rate: float,
+) -> CatchFeasibility:
+    desired_flange = flange_position_for_cup(cup_target_w, flange_rotation_wf, geometry)
+    displacement_from_base = float(np.linalg.norm(desired_flange - base_flange_position))
+    remaining_distance = float(np.linalg.norm(desired_flange - current_flange_goal))
+    available_flange_speed = max_step * command_rate
+    required_flange_speed = None
+
+    if displacement_from_base > max_displacement + 1e-9:
+        return CatchFeasibility(
+            feasible=False,
+            reason="outside-flange-envelope",
+            desired_flange_w=desired_flange,
+            displacement_from_base=displacement_from_base,
+            remaining_distance=remaining_distance,
+            required_flange_speed=None,
+            available_flange_speed=available_flange_speed,
+        )
+
+    if crossing_time <= 0.0:
+        return CatchFeasibility(
+            feasible=False,
+            reason="nonpositive-crossing-time",
+            desired_flange_w=desired_flange,
+            displacement_from_base=displacement_from_base,
+            remaining_distance=remaining_distance,
+            required_flange_speed=None,
+            available_flange_speed=available_flange_speed,
+        )
+
+    required_flange_speed = remaining_distance / crossing_time
+    if required_flange_speed > available_flange_speed + 1e-9:
+        return CatchFeasibility(
+            feasible=False,
+            reason="too-late-for-flange-step-limit",
+            desired_flange_w=desired_flange,
+            displacement_from_base=displacement_from_base,
+            remaining_distance=remaining_distance,
+            required_flange_speed=required_flange_speed,
+            available_flange_speed=available_flange_speed,
+        )
+
+    return CatchFeasibility(
+        feasible=True,
+        reason="ok",
+        desired_flange_w=desired_flange,
+        displacement_from_base=displacement_from_base,
+        remaining_distance=remaining_distance,
+        required_flange_speed=required_flange_speed,
+        available_flange_speed=available_flange_speed,
+    )
+
+
+def feasible_catch_prediction(
+    prediction: tuple[np.ndarray, float] | None,
+    current_flange_goal: np.ndarray,
+    base_flange_position: np.ndarray,
+    flange_rotation_wf: np.ndarray,
+    geometry: KendamaGeometry,
+    max_step: float,
+    max_displacement: float,
+    command_rate: float,
+) -> tuple[tuple[np.ndarray, float] | None, CatchFeasibility | None]:
+    if prediction is None:
+        return None, None
+    cup_target, crossing_time = prediction
+    feasibility = evaluate_catch_feasibility(
+        cup_target,
+        crossing_time,
+        current_flange_goal,
+        base_flange_position,
+        flange_rotation_wf,
+        geometry,
+        max_step,
+        max_displacement,
+        command_rate,
+    )
+    if not feasibility.feasible:
+        return None, feasibility
+    return prediction, feasibility
 
 
 def bounded_flange_goal(
@@ -938,11 +1096,13 @@ def build_model_snapshot(
         energy = pendulum_energy(pendulum.theta, pendulum.theta_dot, params.string_length)
         target_energy = params.energy_fraction * 2.0 * GRAVITY_MAG * params.string_length
         if cup_w is not None:
-            catch = catch_cup_target(
-                ball_w,
-                ball_velocity_w,
+            catch = taut_pendulum_catch_target(
+                anchor_w,
+                pendulum,
                 cup_w[2],
                 geometry,
+                params,
+                swing_axis_world,
                 params.catch_time_horizon,
             )
 
@@ -1170,8 +1330,15 @@ def dry_run(args: argparse.Namespace, geometry: KendamaGeometry, params: SwingPa
 
         if step % print_period == 0 or step == total_steps:
             ball = ball_position_from_state(anchor, state, params, swing_axis)
-            ball_vel = ball_velocity_from_state(state, params, swing_axis)
-            catch = catch_cup_target(ball, ball_vel, 0.0, geometry, params.catch_time_horizon)
+            catch = taut_pendulum_catch_target(
+                anchor,
+                state,
+                0.0,
+                geometry,
+                params,
+                swing_axis,
+                params.catch_time_horizon,
+            )
             catch_text = ""
             if catch is not None:
                 _, crossing_time = catch
@@ -1281,6 +1448,7 @@ def redis_loop(args: argparse.Namespace, geometry: KendamaGeometry, params: Swin
     catch_latch = None
     previous_ball = None
     previous_ball_time = None
+    last_catch_feasibility = None
 
     if args.command:
         raw_ball_start, _, ball_pose_candidates = get_first_available(client, ball_pose_key)
@@ -1376,6 +1544,7 @@ def redis_loop(args: argparse.Namespace, geometry: KendamaGeometry, params: Swin
         if not validity.valid:
             phase = Phase.SWING_UP
             catch_latch = None
+            last_catch_feasibility = None
             damp_start = None
             damp_base_flange = None
             anchor_goal = base_anchor.copy()
@@ -1416,12 +1585,24 @@ def redis_loop(args: argparse.Namespace, geometry: KendamaGeometry, params: Swin
             swing_axis,
         )
 
-        catch = catch_cup_target(
-            ball,
-            ball_velocity,
+        catch_prediction = taut_pendulum_catch_target(
+            current_anchor,
+            state,
             base_cup[2],
             geometry,
+            params,
+            swing_axis,
             params.catch_time_horizon,
+        )
+        catch, last_catch_feasibility = feasible_catch_prediction(
+            catch_prediction,
+            flange_goal,
+            base_flange_position,
+            hold_rotation,
+            geometry,
+            args.max_step,
+            args.max_flange_displacement,
+            args.rate,
         )
         catch_latch = update_catch_latch(
             catch,
@@ -1486,6 +1667,8 @@ def redis_loop(args: argparse.Namespace, geometry: KendamaGeometry, params: Swin
                     f"catch_age={age:.3f}s "
                     f"cup_target={np.round(catch_latch.cup_center_w, 3).tolist()}"
                 )
+            elif last_catch_feasibility is not None and not last_catch_feasibility.feasible:
+                catch_text = f" catch_reject={last_catch_feasibility.reason}"
             print(
                 f"{phase.name:11s} "
                 f"theta={math.degrees(state.theta):7.2f}deg "
@@ -1592,7 +1775,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--max-string-length-error",
         type=float,
         default=0.15,
-        help="Maximum allowed initial |ball-anchor distance - string length| before command mode refuses to arm.",
+        help="Maximum allowed |ball-anchor distance - string length| before live model updates are gated off.",
     )
     parser.add_argument(
         "--max-ball-speed",
@@ -1614,6 +1797,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--catch-xy-window", type=float, default=0.045)
     parser.add_argument("--catch-height-window", type=float, default=0.08)
     parser.add_argument("--catch-time-horizon", type=float, default=0.90)
+    parser.add_argument("--catch-prediction-dt", type=float, default=0.005)
     parser.add_argument("--catch-target-timeout", type=float, default=0.20)
     parser.add_argument("--initial-theta-deg", type=float, default=20.0)
     parser.add_argument("--initial-theta-dot-deg", type=float, default=0.0)
@@ -1649,6 +1833,8 @@ def main() -> None:
         raise ValueError("--catch-height-window must be non-negative")
     if args.catch_time_horizon <= 0.0:
         raise ValueError("--catch-time-horizon must be positive")
+    if args.catch_prediction_dt <= 0.0:
+        raise ValueError("--catch-prediction-dt must be positive")
     if args.catch_target_timeout < 0.0:
         raise ValueError("--catch-target-timeout must be non-negative")
     if args.velocity_estimate_samples < 2:
@@ -1694,6 +1880,7 @@ def main() -> None:
         catch_xy_window=args.catch_xy_window,
         catch_height_window=args.catch_height_window,
         catch_time_horizon=args.catch_time_horizon,
+        catch_prediction_dt=args.catch_prediction_dt,
         catch_target_timeout=args.catch_target_timeout,
     )
 

@@ -42,7 +42,21 @@ anchor position.
 
 ## Catch
 
-The catch mode predicts where the descending ball crosses the catch plane:
+The live catch mode predicts where the descending ball crosses the catch plane
+by rolling the taut pendulum model forward with the current anchor held fixed:
+
+```text
+theta_dot_dot = (g dot e_theta) / L
+B(t) = A + L e_r(theta(t))
+z_B(t*) = z_C + ball_center_above_cup
+p_C,des = [x_B(t*), y_B(t*), z_C]
+p_F,des = p_C,des - R_WF r_FC
+```
+
+The forecast horizon is `--catch-time-horizon`, and the integration step is
+`--catch-prediction-dt`.
+
+The script keeps a ballistic predictor for free-flight reference checks:
 
 ```text
 z_B(t) = z_B0 + v_Bz t - 0.5 g t^2
@@ -73,6 +87,15 @@ Command mode also checks the initial ball-anchor distance before arming. If
 before switching to the Cartesian controller. This prevents applying the
 taut-string swing-up model when the sensed ball is not plausibly attached at
 the configured string length.
+
+The same validity check runs every Redis cycle. If the live ball state violates
+the taut-string assumptions, or if the ball speed exceeds `--max-ball-speed`,
+the loop clears any catch target and stops using pendulum/catch updates until
+the state becomes plausible again. The default invalid-state action is
+`--invalid-state-action recenter`, which walks the flange goal back toward the
+starting pose through the same `--max-step` and `--max-flange-displacement`
+limits. Use `--invalid-state-action hold` if a trial should freeze the last
+flange goal instead.
 
 ## Ball Sensing
 

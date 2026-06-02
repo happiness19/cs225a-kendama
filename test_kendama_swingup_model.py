@@ -32,6 +32,7 @@ from kendama_swingup_model import (
     pendulum_units,
     publish_ball_in_cup_fixture,
     swingup_anchor_accel,
+    taut_pendulum_catch_target,
     transform_payload,
     update_catch_latch,
 )
@@ -120,6 +121,46 @@ class KendamaSwingupModelTest(unittest.TestCase):
         self.assertAlmostEqual(cup_target[2], 0.30)
         self.assertAlmostEqual(cup_target[0], ball_position[0] + ball_velocity[0] * crossing_time)
         self.assertAlmostEqual(cup_target[1], ball_position[1] + ball_velocity[1] * crossing_time)
+
+    def test_taut_pendulum_catch_target_predicts_descending_plane_crossing(self):
+        geometry = KendamaGeometry(ball_center_above_cup=0.039)
+        params = SwingParams(string_length=0.4, catch_prediction_dt=0.001)
+        state = PendulumState(theta=math.radians(150.0), theta_dot=math.radians(-40.0))
+        anchor = np.array([0.0, 0.0, 0.0])
+        swing_axis = np.array([1.0, 0.0, 0.0])
+
+        catch = taut_pendulum_catch_target(
+            anchor,
+            state,
+            cup_height=0.0,
+            geometry=geometry,
+            params=params,
+            swing_axis_world=swing_axis,
+            horizon=1.0,
+        )
+
+        self.assertIsNotNone(catch)
+        cup_target, crossing_time = catch
+        self.assertGreater(crossing_time, 0.0)
+        self.assertLess(crossing_time, 1.0)
+        self.assertAlmostEqual(cup_target[2], 0.0)
+
+    def test_taut_pendulum_catch_target_respects_horizon(self):
+        geometry = KendamaGeometry(ball_center_above_cup=0.039)
+        params = SwingParams(string_length=0.4, catch_prediction_dt=0.001)
+        state = PendulumState(theta=math.radians(150.0), theta_dot=math.radians(-40.0))
+
+        catch = taut_pendulum_catch_target(
+            np.array([0.0, 0.0, 0.0]),
+            state,
+            cup_height=0.0,
+            geometry=geometry,
+            params=params,
+            swing_axis_world=np.array([1.0, 0.0, 0.0]),
+            horizon=0.01,
+        )
+
+        self.assertIsNone(catch)
 
     def test_catch_latch_survives_short_prediction_gap(self):
         first = (np.array([0.5, 0.1, 0.3]), 0.25)
@@ -306,12 +347,73 @@ class KendamaSwingupModelTest(unittest.TestCase):
         np.testing.assert_allclose(snapshot.cup_w, [0.0, 0.0, 0.10])
         np.testing.assert_allclose(snapshot.flange.rotation, transform.rotation)
 
+    def test_model_snapshot_invalid_ball_state_suppresses_pendulum_and_catch(self):
+        client = MemoryRedis()
+        keys = RedisKeys("Titania")
+        transform = Transform(np.array([0.0, 0.0, 0.0]), np.eye(3))
+        ball_pose_key = "KendamaBall::pos"
+        ball_velocity_key = "KendamaBall::vel"
+
+        client.set(keys.flange_transform, transform_payload(transform))
+        client.set(ball_pose_key, json.dumps([1.0, 0.0, 0.0]))
+        client.set(ball_velocity_key, json.dumps([0.0, 0.0, -1.0]))
+
+        snapshot = build_model_snapshot(
+            client,
+            keys,
+            KendamaGeometry(anchor_offset_f=np.array([0.0, 0.0, 0.0])),
+            SwingParams(string_length=0.4, max_string_length_error=0.05),
+            ball_pose_key,
+            ball_velocity_key,
+            np.array([1.0, 0.0, 0.0]),
+        )
+
+        self.assertIsNotNone(snapshot.ball_state_validity)
+        self.assertFalse(snapshot.ball_state_validity.valid)
+        self.assertEqual(snapshot.ball_state_validity.reason, "string-mismatch")
+        self.assertIsNone(snapshot.pendulum)
+        self.assertIsNone(snapshot.energy)
+        self.assertIsNone(snapshot.catch)
+
     def test_ball_anchor_string_error(self):
         anchor = np.array([0.0, 0.0, 0.0])
         ball = np.array([0.3, 0.4, 0.0])
 
         self.assertAlmostEqual(ball_anchor_distance(anchor, ball), 0.5)
         self.assertAlmostEqual(ball_anchor_string_error(anchor, ball, 0.4), 0.1)
+
+    def test_ball_state_validity_rejects_string_mismatch(self):
+        validity = evaluate_ball_state_validity(
+            np.array([0.0, 0.0, 0.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 0.0, 0.0]),
+            SwingParams(string_length=0.4, max_string_length_error=0.05),
+        )
+
+        self.assertFalse(validity.valid)
+        self.assertEqual(validity.reason, "string-mismatch")
+        self.assertAlmostEqual(validity.string_length_error, 0.6)
+
+    def test_ball_state_validity_rejects_implausible_speed(self):
+        validity = evaluate_ball_state_validity(
+            np.array([0.0, 0.0, 0.0]),
+            np.array([0.4, 0.0, 0.0]),
+            np.array([9.0, 0.0, 0.0]),
+            SwingParams(string_length=0.4, max_string_length_error=0.05, max_ball_speed=8.0),
+        )
+
+        self.assertFalse(validity.valid)
+        self.assertEqual(validity.reason, "ball-speed-too-high")
+        self.assertAlmostEqual(validity.ball_speed, 9.0)
+
+    def test_invalid_ball_state_desired_flange_actions(self):
+        current = np.array([0.2, 0.0, 0.0])
+        base = np.array([0.0, 0.1, 0.0])
+
+        np.testing.assert_allclose(invalid_ball_state_desired_flange("hold", current, base), current)
+        np.testing.assert_allclose(invalid_ball_state_desired_flange("recenter", current, base), base)
+        with self.assertRaises(ValueError):
+            invalid_ball_state_desired_flange("bad-action", current, base)
 
     def test_ball_pose_candidate_diagnostics_scores_all_candidates(self):
         client = MemoryRedis()

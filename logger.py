@@ -10,8 +10,8 @@ import redis
 
 DEFAULT_ROBOT_NAME = "Titania"
 DEFAULT_ROBOT_SN = "Rizon4R_062043"
-DEFAULT_RATE_HZ = 250.0
-DEFAULT_DURATION_SEC = 30.0
+DEFAULT_RATE_HZ = 150.0
+DEFAULT_DURATION_SEC = 120.0
 
 
 def vec(values) -> str:
@@ -108,6 +108,9 @@ def main() -> None:
         "tcp_vel",
         "flange_pose",
         "flange_transform",
+        "cartesian_task_current_orientation",
+        "kendama_bot_pos",
+        "kendama_bot_ori",
         "ext_wrench_in_tcp",
         "ext_wrench_in_world",
         "ext_wrench_in_world_raw",
@@ -117,6 +120,12 @@ def main() -> None:
     robot = flexivrdk.Robot(args.robot_sn)
     redis_client = redis.Redis(host=args.redis_host, port=args.redis_port)
     flange_transform_key = f"opensai::sensors::{args.robot_name}::flange_transform"
+    cartesian_task_current_orientation_key = (
+        f"opensai::controllers::{args.robot_name}"
+        "::cartesian_controller::cartesian_task::current_orientation"
+    )
+    kendama_bot_pos_key = "KendamaBot::pos"
+    kendama_bot_ori_key = "KendamaBot::ori"
 
     try:
         if not args.skip_free_drive:
@@ -159,6 +168,11 @@ def main() -> None:
                         "tcp_vel": vec(get_attr(state, "tcp_vel")),
                         "flange_pose": vec(get_attr(state, "flange_pose")),
                         "flange_transform": decode_redis_value(redis_client.get(flange_transform_key)),
+                        "cartesian_task_current_orientation": decode_redis_value(
+                            redis_client.get(cartesian_task_current_orientation_key)
+                        ),
+                        "kendama_bot_pos": decode_redis_value(redis_client.get(kendama_bot_pos_key)),
+                        "kendama_bot_ori": decode_redis_value(redis_client.get(kendama_bot_ori_key)),
                         "ext_wrench_in_tcp": vec(get_attr(state, "ext_wrench_in_tcp")),
                         "ext_wrench_in_world": vec(get_attr(state, "ext_wrench_in_world")),
                         "ext_wrench_in_world_raw": vec(get_attr(state, "ext_wrench_in_world_raw")),
