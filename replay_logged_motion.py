@@ -404,6 +404,21 @@ def shape_joint_feedforward(
     ]
 
 
+def truncate_joint_samples(samples: list[JointSample], stop_time: float | None) -> list[JointSample]:
+    if stop_time is None or stop_time >= samples[-1].t:
+        return samples
+    if stop_time < 0:
+        raise ValueError("--stop-time must be non-negative")
+
+    times = np.asarray([sample.t for sample in samples], dtype=float)
+    q = np.vstack([sample.q for sample in samples])
+    stop_time = max(float(stop_time), float(times[0]))
+    stop_q = np.array([np.interp(stop_time, times, q[:, j]) for j in range(q.shape[1])], dtype=float)
+    truncated = [sample for sample in samples if sample.t < stop_time]
+    truncated.append(JointSample(stop_time, stop_q, np.zeros(7), np.zeros(7)))
+    return truncated
+
+
 def shape_cartesian_samples(
     samples: list[PoseSample],
     amplitude: float,
@@ -454,6 +469,35 @@ def apply_orientation_mode(
         return held, "holding the starting OpenSai task orientation"
 
     raise ValueError(f"Unknown orientation mode {orientation_mode!r}")
+
+
+def interpolate_pose_samples(samples: list[PoseSample], sample_time: float) -> PoseSample:
+    times = np.asarray([sample.t for sample in samples], dtype=float)
+    sample_time = max(float(sample_time), float(times[0]))
+    insert_at = int(np.searchsorted(times, sample_time, side="left"))
+    if insert_at == 0:
+        return PoseSample(sample_time, samples[0].position.copy(), samples[0].orientation.copy())
+    if insert_at >= len(samples):
+        last = samples[-1]
+        return PoseSample(sample_time, last.position.copy(), last.orientation.copy())
+    previous = samples[insert_at - 1]
+    current = samples[insert_at]
+    dt = current.t - previous.t
+    alpha = 0.0 if dt <= 0 else (sample_time - previous.t) / dt
+    position = (1.0 - alpha) * previous.position + alpha * current.position
+    orientation = slerp(matrix_to_quat_wxyz(previous.orientation), matrix_to_quat_wxyz(current.orientation), alpha)
+    return PoseSample(sample_time, position, quat_wxyz_to_matrix(orientation))
+
+
+def truncate_pose_samples(samples: list[PoseSample], stop_time: float | None) -> list[PoseSample]:
+    if stop_time is None or stop_time >= samples[-1].t:
+        return samples
+    if stop_time < 0:
+        raise ValueError("--stop-time must be non-negative")
+    stop_time = max(float(stop_time), samples[0].t)
+    truncated = [sample for sample in samples if sample.t < stop_time]
+    truncated.append(interpolate_pose_samples(samples, stop_time))
+    return truncated
 
 
 def get_json_array(client: redis.Redis, key: str) -> np.ndarray | None:
@@ -900,6 +944,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--time-source", default="robot", choices=("robot", "wall"))
     parser.add_argument("--speed", type=float, default=1.0, help="1.0 replays the original timing.")
+    parser.add_argument(
+        "--stop-time",
+        type=float,
+        help="Stop replay at this relative log time in seconds and hold the interpolated target.",
+    )
     parser.add_argument("--smooth-window", type=float, default=0.0, help="Joint-mode moving-average window in seconds.")
     parser.add_argument("--downsample-hz", type=float, help="Joint-mode output rate after interpolation.")
     parser.add_argument("--joint-amplitude", type=float, default=1.0, help="Scale joint motion away from the reference pose.")
@@ -979,6 +1028,8 @@ def main() -> None:
         raise ValueError("--default-hold-time must be non-negative")
     if args.smooth_window < 0:
         raise ValueError("--smooth-window must be non-negative")
+    if args.stop_time is not None and args.stop_time < 0:
+        raise ValueError("--stop-time must be non-negative")
     if args.max_goal_acceleration is not None and args.max_goal_acceleration < 0:
         args.max_goal_acceleration = None
     joint_amplitude_vector = parse_vec(args.joint_amplitude_vector, expected=7) if args.joint_amplitude_vector else None
@@ -998,6 +1049,10 @@ def main() -> None:
             args.joint_velocity_gain,
             args.joint_acceleration_gain,
         )
+        original_duration = samples[-1].t
+        samples = truncate_joint_samples(samples, args.stop_time)
+        if samples[-1].t < original_duration:
+            print(f"Replay cutoff: stopping at t={samples[-1].t:.3f}s before original duration {original_duration:.3f}s")
         summarize_joint(samples, first_row)
         if args.save_trajectory:
             write_joint_trajectory(args.save_trajectory, samples, first_row)
@@ -1006,6 +1061,10 @@ def main() -> None:
         samples, first_row = load_trajectory(args.logfile, args.pose_column, args.time_source)
         samples, orientation_note = apply_orientation_mode(samples, first_row, args.orientation_mode)
         samples = shape_cartesian_samples(samples, args.cartesian_amplitude, args.cartesian_lock_axis)
+        original_duration = samples[-1].t
+        samples = truncate_pose_samples(samples, args.stop_time)
+        if samples[-1].t < original_duration:
+            print(f"Replay cutoff: stopping at t={samples[-1].t:.3f}s before original duration {original_duration:.3f}s")
         summarize(samples, first_row, args.pose_column)
         print(f"Orientation handling: {orientation_note}")
         if args.cartesian_lock_axis:
