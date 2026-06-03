@@ -1,8 +1,12 @@
 import argparse
 import json
 import math
+import select
 import signal
+import sys
+import termios
 import time
+import tty
 
 import numpy as np
 import redis
@@ -48,6 +52,48 @@ CATCH_DESCENT_VELOCITY_THRESHOLD = -0.02
 POST_CATCH_DROP = 0.02
 POST_CATCH_DROP_HOLD = 0.25
 POST_CATCH_SETTLE = 0.35
+SAFETY_HOME_RESULT = "home_requested"
+
+
+class SafetyHomeInput:
+    """Non-blocking terminal hotkey for returning the robot to home."""
+
+    def __init__(self, trigger_key="1"):
+        if len(trigger_key) != 1:
+            raise ValueError("--home-key must be a single character.")
+        self.trigger_key = trigger_key
+        self._fd = None
+        self._old_settings = None
+        self._enabled = False
+
+    def __enter__(self):
+        if not sys.stdin.isatty():
+            print("[Safety] stdin is not a terminal; home hotkey disabled.")
+            return self
+
+        self._fd = sys.stdin.fileno()
+        self._old_settings = termios.tcgetattr(self._fd)
+        tty.setcbreak(self._fd)
+        self._enabled = True
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    def close(self):
+        if self._enabled and self._old_settings is not None:
+            termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_settings)
+        self._enabled = False
+
+    def requested(self):
+        if not self._enabled:
+            return False
+
+        readable, _, _ = select.select([sys.stdin], [], [], 0)
+        if not readable:
+            return False
+
+        return sys.stdin.read(1) == self.trigger_key
 
 
 def make_keys(robot_name):
@@ -283,7 +329,7 @@ def predict_landing(ball_positions: list, target_z: float, dt: float,
     return np.array([x_now + vx * s, y_now + vy * s, target_z])
 
 
-def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
+def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z, safety_input=None):
     """Switch to Cartesian control and track/catch the ball."""
     print("Switching to Cartesian controller...")
     set_active_controller(client, keys["active"], "cartesian_controller")
@@ -326,8 +372,14 @@ def track_ball(client, keys, ball_pos_key, max_step, dt, cup_z):
     if catch_z != cup_z:
         print(f"Effective catch Z after workspace clamp: {catch_z}")
     print("Tracking ball — press Ctrl+C to stop.")
+    if safety_input is not None:
+        print(f"[Safety] Press '{safety_input.trigger_key}' to return to home.")
 
     while True:
+        if safety_input is not None and safety_input.requested():
+            print("\n[Safety] Home hotkey received; stopping Cartesian tracking.")
+            return SAFETY_HOME_RESULT
+
         ee_pos   = get_vec(client, keys["pos_cur"])
         ball_pos = get_vec(client, ball_pos_key)
 
@@ -495,7 +547,11 @@ def main():
     parser.add_argument("--cup-z",    type=float, default=0.4,
                         help="Z height of the cup/catch target (meters). "
                              "⚠️  Measure and set this accurately before running.")
+    parser.add_argument("--home-key", default="1",
+                        help="Single terminal key that stops tracking and returns home.")
     args = parser.parse_args()
+    if len(args.home_key) != 1:
+        parser.error("--home-key must be a single character.")
 
     client = redis.Redis(host=args.host, port=args.port)
     keys   = make_keys(ROBOT_NAME)
@@ -507,8 +563,17 @@ def main():
 
     go_home(client, keys, DEFAULT_HOME_JOINTS)
     time.sleep(1.0)
-    track_ball(client, keys, args.ball_pos, args.max_step,
-               1.0 / args.rate, cup_z=args.cup_z)
+    while True:
+        with SafetyHomeInput(args.home_key) as safety_input:
+            result = track_ball(client, keys, args.ball_pos, args.max_step,
+                                1.0 / args.rate, cup_z=args.cup_z,
+                                safety_input=safety_input)
+
+        if result == SAFETY_HOME_RESULT:
+            print("[Safety] Returning to home position.")
+            go_home(client, keys, DEFAULT_HOME_JOINTS)
+            print("[Safety] Home reset complete. Restarting tracking.")
+            time.sleep(1.0)
 
 
 if __name__ == "__main__":
