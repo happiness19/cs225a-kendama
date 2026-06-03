@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stop_time="${STOP_TIME:-5.325}"
+stop_time="${STOP_TIME:-5.327}"
 
 if [[ $# -gt 0 ]]; then
     case "$1" in
