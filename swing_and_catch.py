@@ -113,15 +113,26 @@ ROBOT_NAME = "Titania"
 # Home pose. Matches move_with_ball.py's DEFAULT_HOME_JOINTS (kendama pointing
 # perpendicular to the ground), NOT main.py's DEFAULT_JOINTS. Change if your
 # swing's start pose differs.
+# DEFAULT_HOME_JOINTS = np.array([
+#     math.radians(49.22),
+#     math.radians(-98.22),
+#     math.radians(-97.69),
+#     math.radians(83.55),
+#     math.radians(98.78),
+#     math.radians(-6.29),
+#     math.radians(-33.43),
+# ])
+
 DEFAULT_HOME_JOINTS = np.array([
-    math.radians(49.22),
-    math.radians(-98.22),
-    math.radians(-97.69),
-    math.radians(83.55),
-    math.radians(98.78),
-    math.radians(-6.29),
-    math.radians(-33.43),
+    math.radians(1.70),
+    math.radians(-74.46),
+    math.radians(-2.47),
+    math.radians(75.42),
+    math.radians(-0.90),
+    math.radians(148.87),
+    math.radians(-5.87),
 ])
+
 
 # --- Swing -> Track trigger -------------------------------------------------
 # WORLD AXIS: which coordinate of the ball position is "up". 2 = Z (default).
@@ -130,7 +141,9 @@ DEFAULT_HOME_JOINTS = np.array([
 Z_AXIS = 2
 # Ball crosses this height (in world coords, on Z_AXIS) at the top of the swing
 # -> hand off to tracking. Tune by hand; start near the EE's height.
-Z_THRESHOLD = 0.30
+Z_THRESHOLD = 2.0
+
+TIMEOUT = 5.275
 
 # --- Tracking (copied from move_with_ball.py) -------------------------------
 MAX_Z = 0.319234   # Z ceiling
@@ -160,6 +173,19 @@ DEFAULT_SMOOTH_WINDOW = 0.0        # seconds; 0 = no smoothing
 # ============================================================================
 import json
 
+def set_active_controller(client, keys, name, timeout=5.0):
+    deadline = time.perf_counter() + timeout
+    while time.perf_counter() < deadline:
+        client.set(keys.active_controller, name)
+        cur = client.get(keys.active_controller)
+        if cur is not None and cur.decode("utf-8") == name:
+            return
+        time.sleep(0.01)
+    raise TimeoutError(f"Timed out switching to {name}")
+
+
+
+
 
 def get_vec(client, key):
     raw = client.get(key)
@@ -177,7 +203,7 @@ def go_home(client, keys: RedisKeys, home_joints, max_step_deg=0.5,
     """Drive slowly to home in JOINT mode. Same interpolation idea as
     move_with_ball.py.go_home, but uses the reused RedisKeys/controller name."""
     print("[Home] Switching to joint controller...")
-    rlm_set_active_controller(client, keys, keys.joint_controller_name, timeout=5.0)
+    set_active_controller(client, keys, keys.joint_controller_name, timeout=5.0)
 
     q = None
     while q is None:
@@ -225,7 +251,7 @@ def run_calibration(client, keys, ball_pos_key):
     input("[Calibrate] Seat the ball IN THE CUP, then press Enter...")
 
     # Need a Cartesian read of the EE; switch controller so pos_cur is fresh.
-    rlm_set_active_controller(client, keys, keys.cartesian_controller_name, timeout=5.0)
+    set_active_controller(client, keys, keys.cartesian_controller_name, timeout=5.0)
     time.sleep(0.2)
 
     ee_pos = get_vec(client, keys.cartesian_current_position)
@@ -259,7 +285,7 @@ def run_swing(client, keys, samples, ball_pos_key, dt, speed,
     Z threshold was crossed (hand off to track), False if the swing finished
     without crossing (fallback)."""
     print("[Swing] Switching to joint controller and replaying...")
-    rlm_set_active_controller(client, keys, keys.joint_controller_name, timeout=5.0)
+    set_active_controller(client, keys, keys.joint_controller_name, timeout=5.0)
 
     start = time.perf_counter()
     for sample in samples:
@@ -285,6 +311,10 @@ def run_swing(client, keys, samples, ball_pos_key, dt, speed,
                   f"({ball_pos[Z_AXIS]:.3f} > {Z_THRESHOLD}) — handing off.")
             return True
 
+        if time.perf_counter() - start >= TIMEOUT:
+            print("[Swing] Timeout — ending this swing attempt.")
+            return False
+
     print("[Swing] Replay finished without crossing threshold (fallback).")
     return False
 
@@ -295,7 +325,7 @@ def run_swing(client, keys, samples, ball_pos_key, dt, speed,
 # ============================================================================
 def run_handoff(client, keys):
     print("[Handoff] Switching to Cartesian controller...")
-    rlm_set_active_controller(client, keys, keys.cartesian_controller_name, timeout=5.0)
+    set_active_controller(client, keys, keys.cartesian_controller_name, timeout=5.0)
     time.sleep(0.2)
 
     ee_pos = get_vec(client, keys.cartesian_current_position)
@@ -360,7 +390,7 @@ def main():
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=6379)
     parser.add_argument("--rate", type=float, default=100.0)
-    parser.add_argument("--ball-pos", default="KendamaBall::pos")
+    parser.add_argument("--ball-pos", default="KendamaBlueBall::pos")
     parser.add_argument("--max-step", type=float, default=0.003,
                         help="Max Cartesian motion per cycle (m).")
     parser.add_argument("--swing-csv", default=DEFAULT_SWING_CSV)
@@ -381,7 +411,9 @@ def main():
     print(f"[Init] Loaded {len(samples)} swing samples from {args.swing_csv}")
 
     # Calibrate offset once (ball in cup), then loop swing->catch.
-    offset = run_calibration(client, keys, args.ball_pos)
+    #offset = run_calibration(client, keys, args.ball_pos)
+    go_home(client, keys, DEFAULT_HOME_JOINTS)
+
 
     try:
         while True:
@@ -389,9 +421,9 @@ def main():
                                 args.speed, args.feedforward, args.max_accel)
             if not crossed:
                 print("[Loop] Threshold not crossed; handing off anyway.")
-            ee_pos, fixed_ori = run_handoff(client, keys)
-            run_track(client, keys, args.ball_pos, offset, fixed_ori, ee_pos,
-                      args.max_step, dt, TRACK_TIMEOUT)
+            # ee_pos, fixed_ori = run_handoff(client, keys)
+            # run_track(client, keys, args.ball_pos, offset, fixed_ori, ee_pos,
+            #           args.max_step, dt, TRACK_TIMEOUT)
 
             print("[Loop] Returning home for next attempt.")
             go_home(client, keys, DEFAULT_HOME_JOINTS)

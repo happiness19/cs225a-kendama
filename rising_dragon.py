@@ -43,13 +43,24 @@ else:
 
 
 # ROBOT CONSTANTS
-LOWERED_START_JOINT_POS = np.array([0.0,
-    -0.6981317007977318, # =40 degrees
-    0.0,
-    1.57079632679, # =90 degrees
-    0.0,
-    2.2689280275926285, # =130 degrees
-    0.0])
+# LOWERED_START_JOINT_POS = np.array([0.0,
+#     -0.6981317007977318, # =40 degrees
+#     0.0,
+#     1.57079632679, # =90 degrees
+#     0.0,
+#     2.2689280275926285, # =130 degrees
+#     0.0])
+
+LOWERED_START_JOINT_POS = np.array([
+    math.radians(1.70),
+    math.radians(-74.46),
+    math.radians(-2.47),
+    math.radians(75.42),
+    math.radians(-0.90),
+    math.radians(148.87),
+    math.radians(-5.87),
+])
+
 JOINT_ARRIVAL_TOL       = 3e-2   # L2 norm across the 7 joints (radians)
 
 
