@@ -21,11 +21,13 @@ import numpy as np
 import redis
 
 
-# TUNABLE TRICK PARAMETERS
-MAX_SWING_DEG          = 15.0   # +/- degrees about world z (observed safe limit)
-SWING_PERIOD           = 10.0    # seconds per back-and-forth cycle
-VERTICAL_OSC_AMPLITUDE = 0.1    # meters; set to 0.0 to disable the bounce
+# PARAMETERS
+MAX_SWING_DEG          = 20.0   # +/- degrees about world z (observed safe limit)
+SWING_PERIOD           = 2.0    # seconds per back-and-forth cycle
+VERTICAL_OSC_AMPLITUDE = 0.0    # meters; MAX 0.2
 VERTICAL_OSC_PERIOD    = 5.0    # seconds per up-down cycle
+
+
 
 
 # REAL HARDWARE
@@ -61,10 +63,9 @@ LOWERED_START_JOINT_POS = np.array([
     math.radians(-5.87),
 ])
 
-JOINT_ARRIVAL_TOL       = 0.01  # L2 norm across the 7 joints (radians)
+JOINT_ARRIVAL_TOL       = 0.08  
 
 
-# REDIS KEYS
 _PREFIX        = f"opensai::controllers::{robot_name}"
 KEY_GOAL_POS   = f"{_PREFIX}::cartesian_controller::cartesian_task::goal_position"
 KEY_GOAL_ORI   = f"{_PREFIX}::cartesian_controller::cartesian_task::goal_orientation"
@@ -95,18 +96,14 @@ def set_active_controller(name):
         time.sleep(0.001)
 
 
-# STATE MACHINE
-# Three phases, each entered exactly once:
-#   RESETTING_JOINTS       - wait until the joint controller parks at start
-#   SWITCHING_TO_CARTESIAN - switch controllers and latch the cup's pose
-#   RISING_DRAGON          - run the swing + bounce loop until Ctrl+C
+
 class State(Enum):
     RESETTING_JOINTS       = auto()
     SWITCHING_TO_CARTESIAN = auto()
     RISING_DRAGON          = auto()
 
 
-# VERIFY CONFIG
+
 cfg = r.get(KEY_CONFIG)
 if cfg is None or cfg.decode() != expected_cfg:
     print(f"Expected config:  {expected_cfg}")
@@ -115,7 +112,7 @@ if cfg is None or cfg.decode() != expected_cfg:
     raise SystemExit(1)
 
 
-# DERIVED CONSTANTS
+#  CONSTANTS
 omega_swing   = 2.0 * math.pi / SWING_PERIOD         # rad/s, orientation swing
 omega_osc     = 2.0 * math.pi / VERTICAL_OSC_PERIOD  # rad/s, vertical bounce
 max_swing_rad = math.radians(MAX_SWING_DEG)
@@ -137,6 +134,7 @@ state            = State.RESETTING_JOINTS
 cup_init_pos     = None
 cup_init_ori     = None
 trick_start_time = None
+pivot_xy = None
 
 try:
     while True:
@@ -145,6 +143,8 @@ try:
         # ---- Phase 1: wait for the arm to reach the start pose -------------
         if state == State.RESETTING_JOINTS:
             q = np.array(json.loads(r.get(KEY_JOINT_CUR)))
+            err = np.linalg.norm(LOWERED_START_JOINT_POS - q)
+            print(f"err={err:.4f}  q_deg={np.degrees(q).round(2)}")
             if np.linalg.norm(LOWERED_START_JOINT_POS - q) < JOINT_ARRIVAL_TOL:
                 print("Start pose reached. Switching to Cartesian controller.")
                 state = State.SWITCHING_TO_CARTESIAN
@@ -163,14 +163,14 @@ try:
             print(f"  Cup start pos: {np.round(cup_init_pos, 4).tolist()}")
             print("Starting Rising Dragon. Ctrl+C to stop.")
             trick_start_time = time.perf_counter()
+
+
             state = State.RISING_DRAGON
 
-        # ---- Phase 3: swing the cup orientation about world z --------------
-        # theta(t) = A * sin(omega * t) bounds the joint travel to +/-A,
-        # so no joint can wind past its limit the way continuous rotation
-        # would. Left-multiplying R_z (world-frame rotation) keeps the
-        # cup's opening pointing world +z because R_z @ [0,0,1] = [0,0,1].
+        # ---- swing the cup orientation about world z --------------
         elif state == State.RISING_DRAGON:
+
+            
             t     = time.perf_counter() - trick_start_time
             theta = max_swing_rad * math.sin(omega_swing * t)
             c, s  = math.cos(theta), math.sin(theta)
@@ -179,7 +179,10 @@ try:
                               [0,  0, 1]])
 
             dz      = VERTICAL_OSC_AMPLITUDE * math.sin(omega_osc * t)
+
+
             cup_pos = cup_init_pos + np.array([0.0, 0.0, dz])
+
             cup_ori = R_z @ cup_init_ori
 
             set_cartesian_goal(cup_pos, cup_ori)
