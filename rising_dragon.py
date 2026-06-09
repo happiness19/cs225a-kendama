@@ -22,7 +22,7 @@ import redis
 
 
 # TUNABLE TRICK PARAMETERS
-MAX_SWING_DEG          = 0.0   # +/- degrees about world z (observed safe limit)
+MAX_SWING_DEG          = 15.0   # +/- degrees about world z (observed safe limit)
 SWING_PERIOD           = 10.0    # seconds per back-and-forth cycle
 VERTICAL_OSC_AMPLITUDE = 0.1    # meters; set to 0.0 to disable the bounce
 VERTICAL_OSC_PERIOD    = 5.0    # seconds per up-down cycle
@@ -36,7 +36,7 @@ args = parser.parse_args()
 
 if args.real:
     robot_name   = "Titania"
-    expected_cfg = "single_rizon_real.xml"
+    expected_cfg = "kendama_joint_replay.xml"
 else:
     robot_name   = "Rizon4r"
     expected_cfg = "single_rizon_vis.xml"
@@ -61,7 +61,7 @@ LOWERED_START_JOINT_POS = np.array([
     math.radians(-5.87),
 ])
 
-JOINT_ARRIVAL_TOL       = 3e-2   # L2 norm across the 7 joints (radians)
+JOINT_ARRIVAL_TOL       = 0.01  # L2 norm across the 7 joints (radians)
 
 
 # REDIS KEYS
@@ -71,7 +71,7 @@ KEY_GOAL_ORI   = f"{_PREFIX}::cartesian_controller::cartesian_task::goal_orienta
 KEY_CUR_POS    = f"{_PREFIX}::cartesian_controller::cartesian_task::current_position"
 KEY_CUR_ORI    = f"{_PREFIX}::cartesian_controller::cartesian_task::current_orientation"
 KEY_JOINT_GOAL = f"{_PREFIX}::joint_controller::joint_task::goal_position"
-KEY_JOINT_CUR  = f"{_PREFIX}::joint_controller::joint_task::current_position"
+KEY_JOINT_CUR  = f"opensai::sensors::{robot_name}::joint_positions"
 KEY_ACTIVE     = f"{_PREFIX}::active_controller_name"
 KEY_CONFIG     = "::sai-interfaces-webui::config_file_name"
 

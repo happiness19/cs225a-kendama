@@ -1,87 +1,4 @@
-"""
-swing_and_catch.py — Combined swing + ball-tracking loop for the kendama demo (v1).
 
-================================================================================
-WHAT THIS SCRIPT DOES (high level)
-================================================================================
-This is a phase state machine that loops the following sequence:
-
-    CALIBRATE  ->  SWING  ->  HANDOFF  ->  TRACK  ->  (return home, repeat)
-
-1. CALIBRATE  Park at home in JOINT mode, then ask you to seat the ball in the
-              cup. On Enter, capture  offset = ee_pos - ball_pos . This offset
-              encodes "ball sitting in the cup." You then let the ball hang.
-2. SWING      Replay the logged joint trajectory (logs/close_enough.csv) in
-              JOINT mode. While replaying, watch the live ball Z each cycle.
-              When ball_z crosses Z_THRESHOLD (the ball swinging up at the end
-              of the arc), abort the replay and hand off.
-3. HANDOFF    Switch JOINT -> CARTESIAN. Seed the Cartesian goal from the LIVE
-              EE pose so the arm does not snap, and capture the swing's ending
-              orientation as the fixed tracking orientation.
-4. TRACK      Shadow the ball:  desired = ball_pos + offset , clamped to the
-              workspace box and rate-limited per cycle, holding fixed_ori. Runs
-              for TRACK_TIMEOUT seconds.
-5. LOOP       Return home (JOINT) and repeat.
-
-================================================================================
-RELATION TO THE EXISTING SCRIPTS — WHAT'S REUSED, WHAT'S NEW
-================================================================================
-REUSED (imported directly from replay_logged_motion.py — tested, proven code):
-  - load_joint_trajectory   : CSV parsing (handles q required, dq/ddq optional)
-  - smooth_joint_samples     : optional moving-average smoothing
-  - truncate_joint_samples   : the --stop-time cutoff behavior
-  - joint_feedforward        : velocity / velocity-acceleration feed-forward
-  - set_joint_command        : writes goal pos/vel/accel to Redis
-  - set_active_controller    : controller switching with confirmation
-  - make_keys (as rlm_make_keys) / RedisKeys : the Redis key layout
-  We deliberately reuse all the *fiddly* trajectory-loading and feed-forward
-  code rather than rewriting it. See SWING phase.
-
-REWRITTEN HERE (small, so you can edit the swing/track loops directly):
-  - The swing replay LOOP itself. replay_logged_motion.replay_joint_samples is
-    a self-contained blocking loop with NO per-cycle ball check. We need to
-    watch ball Z *during* the swing to trigger the handoff, so the ~15-line
-    replay loop lives here (see run_swing) where you fully control the abort.
-  - The TRACK loop is copied from move_with_ball.py (the simple shadowing
-    tracker, NOT the predictive one). Same offset math, same clamps.
-
-SAME AS move_with_ball.py:
-  - offset = ee_pos - ball_pos, desired = ball_pos + offset
-  - workspace clamps (MIN/MAX X/Y/Z), max_step rate limiting, fixed orientation.
-DIFFERENT FROM move_with_ball.py:
-  - The offset is captured during CALIBRATE (ball in cup), BEFORE the swing,
-    instead of at the start of tracking.
-  - fixed_ori is captured at HANDOFF (whatever the swing ended in), so you can
-    swap in a new swing CSV with a different ending orientation freely.
-
-================================================================================
-HOW TO MODIFY THIS SCRIPT (quick index — all knobs are near the top)
-================================================================================
-* Run a DIFFERENT logged motion : pass --swing-csv path/to/file.csv  (or change
-                                   DEFAULT_SWING_CSV). It must be a JOINT-mode
-                                   log with a 'q' column, same as close_enough.
-* Tune the swing->track trigger  : Z_THRESHOLD (and Z_AXIS if the world is
-                                   rotated — see "WORLD AXIS" below).
-* Change the WORLD AXIS          : Z_AXIS picks which coordinate the threshold
-                                   checks. If the robot/world frame is rotated
-                                   so "up" is not index 2, change Z_AXIS. The
-                                   workspace clamps use explicit indices too;
-                                   adjust those if your up-axis changes.
-* Where the OFFSET is defined    : run_calibration(), the line
-                                   offset = ee_pos - ball_pos
-* Where the TRACKING motion is   : run_track(). Edit the shadowing math /
-                                   clamps / max_step there.
-* Where to add a PREDICTIVE model: see the big "INSERT PREDICTION HERE" comment
-                                   inside run_track(). You would replace
-                                   `desired = ball_pos + offset` with a call to
-                                   move_with_ball_predictive.predict_landing()
-                                   plus its ThrowDetector. Left out of v1 on
-                                   purpose to keep this simple.
-* Loop / retry behavior          : TRACK_TIMEOUT controls how long each catch
-                                   attempt tracks before returning home and
-                                   re-swinging. v1 has NO catch-success check.
-================================================================================
-"""
 
 import argparse
 import math
@@ -141,9 +58,9 @@ DEFAULT_HOME_JOINTS = np.array([
 Z_AXIS = 2
 # Ball crosses this height (in world coords, on Z_AXIS) at the top of the swing
 # -> hand off to tracking. Tune by hand; start near the EE's height.
-Z_THRESHOLD = 2.0
+Z_THRESHOLD = 1.3
 
-TIMEOUT = 5.275
+TIMEOUT = 10.0
 
 # --- Tracking (copied from move_with_ball.py) -------------------------------
 MAX_Z = 0.319234   # Z ceiling
@@ -382,9 +299,7 @@ def run_track(client, keys, ball_pos_key, offset, fixed_ori, start_target,
     print("[Track] Timeout — ending this catch attempt.")
 
 
-# ============================================================================
-# MAIN — the loop.
-# ============================================================================
+
 def main():
     parser = argparse.ArgumentParser(description="Swing + catch loop (v1).")
     parser.add_argument("--host", default="localhost")
@@ -411,8 +326,8 @@ def main():
     print(f"[Init] Loaded {len(samples)} swing samples from {args.swing_csv}")
 
     # Calibrate offset once (ball in cup), then loop swing->catch.
-    #offset = run_calibration(client, keys, args.ball_pos)
-    go_home(client, keys, DEFAULT_HOME_JOINTS)
+    offset = run_calibration(client, keys, args.ball_pos)
+    #go_home(client, keys, DEFAULT_HOME_JOINTS)
 
 
     try:
@@ -421,9 +336,9 @@ def main():
                                 args.speed, args.feedforward, args.max_accel)
             if not crossed:
                 print("[Loop] Threshold not crossed; handing off anyway.")
-            # ee_pos, fixed_ori = run_handoff(client, keys)
-            # run_track(client, keys, args.ball_pos, offset, fixed_ori, ee_pos,
-            #           args.max_step, dt, TRACK_TIMEOUT)
+            ee_pos, fixed_ori = run_handoff(client, keys)
+            run_track(client, keys, args.ball_pos, offset, fixed_ori, ee_pos,
+                      args.max_step, dt, TRACK_TIMEOUT)
 
             print("[Loop] Returning home for next attempt.")
             go_home(client, keys, DEFAULT_HOME_JOINTS)
