@@ -22,9 +22,7 @@ from replay_logged_motion import (
     read_current_joints,
 )
 
-# ============================================================================
-# TUNABLES — edit these freely during testing.
-# ============================================================================
+
 ROBOT_NAME = "Titania"
 
 # Home pose. Matches move_with_ball.py's DEFAULT_HOME_JOINTS (kendama pointing
@@ -80,14 +78,7 @@ DEFAULT_MAX_ACCEL = 15.0           # rad/s^2 clip for ff acceleration
 DEFAULT_SMOOTH_WINDOW = 0.0        # seconds; 0 = no smoothing
 
 
-# ============================================================================
-# Redis helpers. These mirror move_with_ball.py's get_vec/set_vec (which use
-# decode_responses=False). replay_logged_motion.py uses decode_responses=True
-# and json-based helpers; to keep ONE client and avoid mixing the two byte/str
-# conventions, we open the client WITHOUT decode_responses (bytes), matching
-# move_with_ball.py, and the reused replay helpers (set_joint_command etc.)
-# only WRITE json strings, which works fine on a bytes client.
-# ============================================================================
+
 import json
 
 def set_active_controller(client, keys, name, timeout=5.0):
@@ -153,9 +144,7 @@ def go_home(client, keys: RedisKeys, home_joints, max_step_deg=0.5,
         time.sleep(0.01)
 
 
-# ============================================================================
-# PHASE 1 — CALIBRATION.  This is WHERE THE OFFSET IS DEFINED.
-# ============================================================================
+
 def run_calibration(client, keys, ball_pos_key):
     """Home, then capture offset = ee_pos - ball_pos with the ball in the cup.
 
@@ -184,10 +173,7 @@ def run_calibration(client, keys, ball_pos_key):
     return offset
 
 
-# ============================================================================
-# PHASE 2 — SWING.  Reuses replay_logged_motion loaders; the LOOP is local so
-# we can watch ball Z and abort. This is the only "new" replay code.
-# ============================================================================
+
 def load_swing(csv_path, stop_time, smooth_window):
     """Load + shape the swing using the TESTED replay_logged_motion functions."""
     samples, _first_row = load_joint_trajectory(csv_path, time_source="robot")
@@ -235,11 +221,6 @@ def run_swing(client, keys, samples, ball_pos_key, dt, speed,
     print("[Swing] Replay finished without crossing threshold (fallback).")
     return False
 
-
-# ============================================================================
-# PHASE 3 — HANDOFF.  Switch to Cartesian and seed the goal from the LIVE EE
-# pose so nothing snaps. Captures the swing's ending orientation.
-# ============================================================================
 def run_handoff(client, keys):
     print("[Handoff] Switching to Cartesian controller...")
     set_active_controller(client, keys, keys.cartesian_controller_name, timeout=5.0)
@@ -256,10 +237,6 @@ def run_handoff(client, keys):
     print(f"[Handoff] Seeded Cartesian goal at {np.round(ee_pos, 4)}")
     return ee_pos.copy(), ee_ori.copy()
 
-
-# ============================================================================
-# PHASE 4 — TRACK.  Copied from move_with_ball.py's shadowing loop.
-# ============================================================================
 def run_track(client, keys, ball_pos_key, offset, fixed_ori, start_target,
               max_step, dt, timeout):
     print("[Track] Shadowing ball...")
@@ -270,13 +247,6 @@ def run_track(client, keys, ball_pos_key, offset, fixed_ori, start_target,
         ball_pos = get_vec(client, ball_pos_key)
         if ball_pos is not None:
 
-            # ----------------------------------------------------------------
-            # INSERT PREDICTION HERE (future work):
-            #   Replace the line below with predictive interception, e.g.
-            #   feed ball_pos into a ThrowDetector + predict_landing() from
-            #   move_with_ball_predictive.py and set `desired` to the predicted
-            #   catch point instead of the live offset shadow. Left out of v1.
-            # ----------------------------------------------------------------
             desired = ball_pos + offset
 
             # Workspace clamps — same as move_with_ball.py.
